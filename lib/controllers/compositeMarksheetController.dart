@@ -35,16 +35,13 @@ class CompositeMarksheetController extends GetxController {
       // Simulate API delay
       await Future.delayed(const Duration(milliseconds: 800));
 
-      // final response = await apiService.getCompositeMarksheets();
-      // yearlyMarks.value = response.map((json) => CompositeMarksheetModel.fromJson(json)).toList();
-
-      // Using dummy data for now
+      // Using dummy data
       yearlyMarks.value = _getDummyData();
 
       // Extract available years
       availableYears.value =
           yearlyMarks.map((m) => m.academicYear).toSet().toList()
-            ..sort((a, b) => b.compareTo(a)); // Latest first
+            ..sort((a, b) => b.compareTo(a));
 
       if (availableYears.isNotEmpty) {
         selectedYear.value = availableYears.first;
@@ -62,24 +59,14 @@ class CompositeMarksheetController extends GetxController {
     }
   }
 
-  /// Select a marksheet to view details
   void selectMarksheet(CompositeMarksheetModel marksheet) {
     selectedMarksheet.value = marksheet;
     marksheetData.value = marksheet;
   }
 
-  /// Filter by year
   void filterByYear(String year) {
     selectedYear.value = year;
     _setCurrentMarksheetForSelectedYear();
-  }
-
-  /// Get filtered marksheets
-  List<CompositeMarksheetModel> get filteredMarksheets {
-    if (selectedYear.value == null) return yearlyMarks;
-    return yearlyMarks
-        .where((m) => m.academicYear == selectedYear.value)
-        .toList();
   }
 
   void _setCurrentMarksheetForSelectedYear() {
@@ -93,7 +80,6 @@ class CompositeMarksheetController extends GetxController {
       return;
     }
 
-    // If multiple exist for a year, prefer most recent.
     byYear.sort((a, b) {
       final aTs = a.createdAt?.millisecondsSinceEpoch ?? 0;
       final bTs = b.createdAt?.millisecondsSinceEpoch ?? 0;
@@ -120,15 +106,13 @@ class CompositeMarksheetController extends GetxController {
 
     try {
       isGeneratingPdf.value = true;
-
-      final pdf = pw.Document();
       final marksheet = selectedMarksheet.value!;
 
-      // Load robust fonts that support Unicode and don't cause parser errors
+      // Load fonts
       final robotoRegular = await PdfGoogleFonts.robotoRegular();
       final robotoBold = await PdfGoogleFonts.robotoBold();
 
-      // Load student photo if available
+      // Load student photo
       pw.ImageProvider? studentPhoto;
       if (marksheet.studentInfo.photoUrl != null &&
           marksheet.studentInfo.photoUrl!.isNotEmpty) {
@@ -139,43 +123,40 @@ class CompositeMarksheetController extends GetxController {
         }
       }
 
-      // Add single page to PDF
+      final pdf = pw.Document();
+
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(30),
-          build: (context) => pw.Column(
-            children: [
-              _buildPdfHeader(marksheet, studentPhoto, robotoBold),
-              pw.SizedBox(height: 16),
-              _buildPdfStudentInfo(
-                marksheet.studentInfo,
-                robotoRegular,
-                robotoBold,
-              ),
-              pw.SizedBox(height: 16),
-              _buildPdfTable(marksheet, robotoRegular, robotoBold),
-              pw.SizedBox(height: 30),
-              _buildPdfFooter(robotoRegular),
-            ],
-          ),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                _buildPdfHeader(marksheet, studentPhoto, robotoBold),
+                pw.SizedBox(height: 20),
+                _buildPdfStudentInfoTable(
+                  marksheet.studentInfo,
+                  robotoRegular,
+                  robotoBold,
+                ),
+                pw.SizedBox(height: 20),
+                _buildPdfAssessmentsTable(marksheet, robotoRegular, robotoBold),
+                pw.Spacer(),
+                _buildPdfFooter(robotoRegular),
+              ],
+            );
+          },
         ),
       );
 
-      // Save and share PDF
       await Printing.sharePdf(
         bytes: await pdf.save(),
         filename:
             'Transcript_${marksheet.studentInfo.studentName.replaceAll(' ', '_')}_${marksheet.academicYear}.pdf',
       );
-
-      Get.snackbar(
-        'Success',
-        'PDF generated successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
     } catch (e) {
+      print('PDF Generation Error: $e');
       Get.snackbar(
         'Error',
         'Failed to generate PDF: ${e.toString()}',
@@ -186,514 +167,246 @@ class CompositeMarksheetController extends GetxController {
     }
   }
 
-  /// Build PDF header perfectly matched to image
   pw.Widget _buildPdfHeader(
     CompositeMarksheetModel marksheet,
     pw.ImageProvider? photo,
     pw.Font boldFont,
   ) {
     return pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.Expanded(flex: 1, child: pw.SizedBox()),
-        pw.Expanded(
-          flex: 4,
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                'TRANSCRIPT',
-                style: pw.TextStyle(
-                  font: boldFont,
-                  fontSize: 26,
-                  color: PdfColors.black,
-                ),
-              ),
-              pw.SizedBox(height: 12),
-              pw.Text(
-                'FOR THE ACADEMIC YEAR ${marksheet.academicYear}',
-                style: pw.TextStyle(
-                  font: boldFont,
-                  fontSize: 16,
-                  color: PdfColors.black,
-                ),
-              ),
-            ],
-          ),
-        ),
-        pw.Expanded(
-          flex: 1,
-          child: pw.Align(
-            alignment: pw.Alignment.topRight,
-            child: pw.Container(
-              width: 80,
-              height: 80,
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.black, width: 1.5),
-              ),
-              child: photo != null
-                  ? pw.Image(photo, fit: pw.BoxFit.cover)
-                  : pw.SizedBox(),
+        pw.SizedBox(width: 80), // Spacer for centering
+        pw.Column(
+          children: [
+            pw.Text(
+              'TRANSCRIPT',
+              style: pw.TextStyle(font: boldFont, fontSize: 24),
             ),
-          ),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'FOR THE ACADEMIC YEAR ${marksheet.academicYear}',
+              style: pw.TextStyle(font: boldFont, fontSize: 16),
+            ),
+          ],
+        ),
+        pw.Container(
+          width: 80,
+          height: 100,
+          decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
+          child: photo != null
+              ? pw.Image(photo, fit: pw.BoxFit.cover)
+              : pw.SizedBox(),
         ),
       ],
     );
   }
 
-  /// Build PDF Student Info explicitly matching cells
-  pw.Widget _buildPdfStudentInfo(
+  pw.Widget _buildPdfStudentInfoTable(
     StudentInfo info,
     pw.Font regFont,
     pw.Font boldFont,
   ) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.5)),
-      child: pw.Column(
-        children: [
-          pw.Container(
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(width: 1)),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                _infoCell(
-                  'Student\'s\nName',
-                  16,
-                  isLabel: true,
-                  alignLeft: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.studentName.toUpperCase(),
-                  34,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  'Std. Id',
-                  10,
-                  isLabel: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  'Class',
-                  15,
-                  isLabel: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.className.toUpperCase(),
-                  25,
-                  hideRightBorder: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-              ],
-            ),
-          ),
-          pw.Container(
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(width: 1)),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                _infoCell(
-                  'Father\'s\nName',
-                  16,
-                  isLabel: true,
-                  alignLeft: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.fatherName.toUpperCase(),
-                  34,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.studentId,
-                  10,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  'Roll #',
-                  15,
-                  isLabel: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.rollNo,
-                  25,
-                  hideRightBorder: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-              ],
-            ),
-          ),
-          pw.Container(
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(width: 1)),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                _infoCell(
-                  'Result',
-                  16,
-                  isLabel: true,
-                  alignLeft: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.result.toUpperCase(),
-                  34,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  'Max.\nMarks',
-                  10,
-                  isLabel: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  info.totalMaxMarks.toStringAsFixed(0),
-                  15,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  'Percentage',
-                  15,
-                  isLabel: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-                _infoCell(
-                  '${info.percentage.toStringAsFixed(2)} %',
-                  10,
-                  hideRightBorder: true,
-                  boldFont: boldFont,
-                  regFont: regFont,
-                ),
-              ],
-            ),
-          ),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              _infoCell(
-                'Position',
-                16,
-                isLabel: true,
-                alignLeft: true,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-              _infoCell(
-                (info.position.isEmpty) ? " " : info.position.toUpperCase(),
-                34,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-              _infoCell(
-                'Obt.\nMarks',
-                10,
-                isLabel: true,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-              _infoCell(
-                info.totalObtainedMarks.toStringAsFixed(0),
-                15,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-              _infoCell(
-                'Grade',
-                15,
-                isLabel: true,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-              _infoCell(
-                info.grade.toUpperCase(),
-                10,
-                hideRightBorder: true,
-                boldFont: boldFont,
-                regFont: regFont,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _infoCell(
-    String text,
-    int flex, {
-    bool isLabel = false,
-    bool hideRightBorder = false,
-    bool alignLeft = false,
-    required pw.Font boldFont,
-    required pw.Font regFont,
-  }) {
-    return pw.Expanded(
-      flex: flex,
-      child: pw.Container(
-        decoration: pw.BoxDecoration(
-          border: hideRightBorder
-              ? null
-              : const pw.Border(right: pw.BorderSide(width: 1)),
-        ),
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        child: alignLeft
-            ? pw.Align(
-                alignment: pw.Alignment.centerLeft,
-                child: pw.Text(
-                  text,
-                  style: pw.TextStyle(
-                    font: isLabel ? boldFont : regFont,
-                    fontSize: 8.5,
-                  ),
-                ),
-              )
-            : pw.Center(
-                child: pw.Text(
-                  text,
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(
-                    font: isLabel ? boldFont : regFont,
-                    fontSize: 8.5,
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-
-  /// Build Custom Assessment Table
-  pw.Widget _buildPdfTable(
-    CompositeMarksheetModel marksheet,
-    pw.Font regFont,
-    pw.Font boldFont,
-  ) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.5)),
-      child: pw.Column(
-        children: [
-          // Header Row
-          pw.Container(
-            decoration: const pw.BoxDecoration(
-              color: PdfColors.grey300,
-              border: pw.Border(bottom: pw.BorderSide(width: 1.5)),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                _headerCell('Learning Area', 18, boldFont),
-                _headerCell('Subject', 18, boldFont),
-                _headerCell('Assessment Title', 28, boldFont),
-                _headerCell('Max\nMarks', 8, boldFont),
-                _headerCell('Passing\nMarks', 8, boldFont),
-                _headerCell('Obt\nMarks', 8, boldFont),
-                _headerCell('Agg.\nMarks', 12, boldFont, hideRightBorder: true),
-              ],
-            ),
-          ),
-          // Subject Rows
-          ...marksheet.subjectAssessments.map((sa) {
-            bool isLastSubject = sa == marksheet.subjectAssessments.last;
-            return pw.Container(
-              decoration: pw.BoxDecoration(
-                border: isLastSubject
-                    ? null
-                    : const pw.Border(bottom: pw.BorderSide(width: 1)),
-              ),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  _bodyCell(
-                    sa.learningArea.toUpperCase(),
-                    18,
-                    boldFont,
-                    regFont,
-                    bold: true,
-                  ),
-                  _bodyCell(
-                    sa.subject.toUpperCase(),
-                    18,
-                    boldFont,
-                    regFont,
-                    bold: true,
-                  ),
-                  pw.Expanded(
-                    flex: 52,
-                    child: pw.Column(
-                      children: sa.assessments.map((a) {
-                        bool isLastAssessment = a == sa.assessments.last;
-                        return pw.Container(
-                          decoration: pw.BoxDecoration(
-                            border: isLastAssessment
-                                ? null
-                                : const pw.Border(
-                                    bottom: pw.BorderSide(width: 1),
-                                  ),
-                          ),
-                          child: pw.Row(
-                            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                            children: [
-                              _bodyCell(
-                                a.assessmentTitle,
-                                28,
-                                boldFont,
-                                regFont,
-                              ),
-                              _bodyCell(
-                                a.maxMarks.toStringAsFixed(0),
-                                8,
-                                boldFont,
-                                regFont,
-                              ),
-                              _bodyCell(
-                                a.passingMarks.toStringAsFixed(0),
-                                8,
-                                boldFont,
-                                regFont,
-                              ),
-                              _bodyCell(
-                                a.obtainedMarks.toStringAsFixed(0),
-                                8,
-                                boldFont,
-                                regFont,
-                                hideRightBorder: true,
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  _bodyCell(
-                    sa.aggregateObtainedMarks.toStringAsFixed(0),
-                    12,
-                    boldFont,
-                    regFont,
-                    hideRightBorder: true,
-                    drawLeftBorder: true,
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _headerCell(
-    String text,
-    int flex,
-    pw.Font boldFont, {
-    bool hideRightBorder = false,
-  }) {
-    return pw.Expanded(
-      flex: flex,
-      child: pw.Container(
-        decoration: pw.BoxDecoration(
-          border: hideRightBorder
-              ? null
-              : const pw.Border(right: pw.BorderSide(width: 1)),
-        ),
-        padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        child: pw.Center(
-          child: pw.Text(
-            text,
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(font: boldFont, fontSize: 8.5),
-          ),
-        ),
-      ),
-    );
-  }
-
-  pw.Widget _bodyCell(
-    String text,
-    int flex,
-    pw.Font boldFont,
-    pw.Font regFont, {
-    bool bold = false,
-    bool hideRightBorder = false,
-    bool drawLeftBorder = false,
-  }) {
-    return pw.Expanded(
-      flex: flex,
-      child: pw.Container(
-        decoration: pw.BoxDecoration(
-          border: pw.Border(
-            right: hideRightBorder
-                ? pw.BorderSide.none
-                : const pw.BorderSide(width: 1),
-            left: drawLeftBorder
-                ? const pw.BorderSide(width: 1)
-                : pw.BorderSide.none,
-          ),
-        ),
-        padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 4),
-        child: pw.Center(
-          child: pw.Text(
-            text,
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(font: bold ? boldFont : regFont, fontSize: 8),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build PDF footer with signature space
-  pw.Widget _buildPdfFooter(pw.Font regFont) {
-    return pw.Column(
+    return pw.Table(
+      border: pw.TableBorder.all(width: 1),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(1.2),
+        1: const pw.FlexColumnWidth(3),
+        2: const pw.FlexColumnWidth(1),
+        3: const pw.FlexColumnWidth(1),
+        4: const pw.FlexColumnWidth(2),
+      },
       children: [
-        pw.SizedBox(height: 40),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        pw.TableRow(
           children: [
-            _buildSignature('Class Teacher', regFont),
-            _buildSignature('Principal', regFont),
-            _buildSignature('Parent/Guardian', regFont),
+            _infoCell('Student\'s\nName', boldFont, alignLeft: true),
+            _infoCell(info.studentName.toUpperCase(), regFont),
+            _infoCell('Std. Id', boldFont),
+            _infoCell('Class', boldFont),
+            _infoCell(info.className.toUpperCase(), regFont),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            _infoCell('Father\'s\nName', boldFont, alignLeft: true),
+            _infoCell(info.fatherName.toUpperCase(), regFont),
+            _infoCell(info.studentId, regFont),
+            _infoCell('Roll #', boldFont),
+            _infoCell(info.rollNo, regFont),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            _infoCell('Result', boldFont, alignLeft: true),
+            _infoCell(info.result.toUpperCase(), regFont),
+            _infoCell('Max.\nMarks', boldFont),
+            _infoCell(info.totalMaxMarks.toStringAsFixed(0), regFont),
+            _infoCell('Percentage', boldFont),
+            _infoCell('${info.percentage.toStringAsFixed(2)} %', regFont),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            _infoCell('Position', boldFont, alignLeft: true),
+            _infoCell(
+              info.position.isEmpty ? " " : info.position.toUpperCase(),
+              regFont,
+            ),
+            _infoCell('Obt.\nMarks', boldFont),
+            _infoCell(info.totalObtainedMarks.toStringAsFixed(0), regFont),
+            _infoCell('Grade', boldFont),
+            _infoCell(info.grade.toUpperCase(), regFont),
           ],
         ),
       ],
     );
   }
 
-  /// Build signature line
-  pw.Widget _buildSignature(String label, pw.Font regFont) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+  pw.Widget _infoCell(String text, pw.Font font, {bool alignLeft = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Align(
+        alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
+        child: pw.Text(
+          text,
+          textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
+          style: pw.TextStyle(font: font, fontSize: 9),
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _buildPdfAssessmentsTable(
+    CompositeMarksheetModel marksheet,
+    pw.Font regFont,
+    pw.Font boldFont,
+  ) {
+    return pw.Table(
+      border: pw.TableBorder.all(width: 1),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(1.8), // Learning Area
+        1: const pw.FlexColumnWidth(1.8), // Subject
+        2: const pw.FlexColumnWidth(4.9), // Assessment Title, Max, Passing, Obt
+        3: const pw.FlexColumnWidth(1.2), // Agg. Marks
+      },
       children: [
-        pw.Container(width: 120, height: 1, color: PdfColors.black),
-        pw.SizedBox(height: 4),
-        pw.Text(label, style: pw.TextStyle(font: regFont, fontSize: 9)),
+        // Header Row
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: [
+            _headerCell('Learning Area', boldFont),
+            _headerCell('Subject', boldFont),
+            pw.Table(
+              border: const pw.TableBorder(
+                left: pw.BorderSide(width: 1),
+                right: pw.BorderSide(width: 1),
+              ),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.5), // Title
+                1: const pw.FlexColumnWidth(0.8), // Max
+                2: const pw.FlexColumnWidth(0.8), // Passing
+                3: const pw.FlexColumnWidth(0.8), // Obt
+              },
+              children: [
+                pw.TableRow(
+                  children: [
+                    _headerCell('Assessment Title', boldFont),
+                    _headerCell('Max\nMarks', boldFont),
+                    _headerCell('Passing\nMarks', boldFont),
+                    _headerCell('Obt\nMarks', boldFont),
+                  ],
+                ),
+              ],
+            ),
+            _headerCell('Agg.\nMarks', boldFont),
+          ],
+        ),
+        // Data Rows
+        ...marksheet.subjectAssessments.map((sa) {
+          return pw.TableRow(
+            children: [
+              _dataCell(sa.learningArea.toUpperCase(), regFont),
+              _dataCell(sa.subject.toUpperCase(), boldFont),
+              // Nested table for assessments
+              pw.Table(
+                border: const pw.TableBorder(
+                  left: pw.BorderSide(width: 1),
+                  right: pw.BorderSide(width: 1),
+                  horizontalInside: pw.BorderSide(width: 1),
+                ),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2.5),
+                  1: const pw.FlexColumnWidth(0.8),
+                  2: const pw.FlexColumnWidth(0.8),
+                  3: const pw.FlexColumnWidth(0.8),
+                },
+                children: sa.assessments.map((a) {
+                  return pw.TableRow(
+                    children: [
+                      _dataCell(a.assessmentTitle, regFont, alignLeft: true),
+                      _dataCell(a.maxMarks.toStringAsFixed(0), regFont),
+                      _dataCell(a.passingMarks.toStringAsFixed(0), regFont),
+                      _dataCell(a.obtainedMarks.toStringAsFixed(0), regFont),
+                    ],
+                  );
+                }).toList(),
+              ),
+              _dataCell(sa.aggregateObtainedMarks.toStringAsFixed(0), boldFont),
+            ],
+          );
+        }).toList(),
       ],
     );
   }
 
-  /// Get dummy data matching the image structure
+  pw.Widget _headerCell(String text, pw.Font font) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(5),
+      child: pw.Center(
+        child: pw.Text(
+          text,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(font: font, fontSize: 9),
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _dataCell(String text, pw.Font font, {bool alignLeft = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(5),
+      child: pw.Align(
+        alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
+        child: pw.Text(
+          text,
+          textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
+          style: pw.TextStyle(font: font, fontSize: 8.5),
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _buildPdfFooter(pw.Font regFont) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        _signatureBox('Class Teacher', regFont),
+        _signatureBox('Principal', regFont),
+        _signatureBox('Parent/Guardian', regFont),
+      ],
+    );
+  }
+
+  pw.Widget _signatureBox(String label, pw.Font font) {
+    return pw.Column(
+      children: [
+        pw.Container(width: 120, height: 1, color: PdfColors.black),
+        pw.SizedBox(height: 5),
+        pw.Text(label, style: pw.TextStyle(font: font, fontSize: 9)),
+      ],
+    );
+  }
+
   List<CompositeMarksheetModel> _getDummyData() {
     return [
       CompositeMarksheetModel(
@@ -856,13 +569,188 @@ class CompositeMarksheetController extends GetxController {
             aggregateMaxMarks: 250,
             aggregateObtainedMarks: 162,
           ),
+          SubjectAssessment(
+            learningArea: 'INTERNATIONAL LANGUAGE',
+            subject: 'ESL',
+            assessments: [
+              Assessment(
+                assessmentId: '17',
+                assessmentTitle: 'Mid Term',
+                maxMarks: 100,
+                passingMarks: 40,
+                obtainedMarks: 100,
+              ),
+              Assessment(
+                assessmentId: '18',
+                assessmentTitle: 'Annual Term',
+                maxMarks: 100,
+                passingMarks: 40,
+                obtainedMarks: 55,
+              ),
+              Assessment(
+                assessmentId: '19',
+                assessmentTitle: 'Preliminary Test (Fall)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 25,
+              ),
+              Assessment(
+                assessmentId: '20',
+                assessmentTitle: 'Preliminary Test (Spring)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 7,
+              ),
+            ],
+            aggregateMaxMarks: 250,
+            aggregateObtainedMarks: 187,
+          ),
+          SubjectAssessment(
+            learningArea: 'SOCIAL SCIENCES',
+            subject: 'GENERAL KNOWLEDGE',
+            assessments: [
+              Assessment(
+                assessmentId: '21',
+                assessmentTitle: 'Mid Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 55,
+              ),
+              Assessment(
+                assessmentId: '22',
+                assessmentTitle: 'Annual Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 55,
+              ),
+              Assessment(
+                assessmentId: '23',
+                assessmentTitle: 'Preliminary Test (Fall)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 20,
+              ),
+              Assessment(
+                assessmentId: '24',
+                assessmentTitle: 'Preliminary Test (Spring)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 6,
+              ),
+            ],
+            aggregateMaxMarks: 200,
+            aggregateObtainedMarks: 136,
+          ),
+          SubjectAssessment(
+            learningArea: 'CHARACTER BUILDING',
+            subject: 'VALUE EDUCATION',
+            assessments: [
+              Assessment(
+                assessmentId: '25',
+                assessmentTitle: 'Mid Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 62,
+              ),
+              Assessment(
+                assessmentId: '26',
+                assessmentTitle: 'Annual Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 55,
+              ),
+              Assessment(
+                assessmentId: '27',
+                assessmentTitle: 'Preliminary Test (Fall)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 18,
+              ),
+              Assessment(
+                assessmentId: '28',
+                assessmentTitle: 'Preliminary Test (Spring)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 5,
+              ),
+            ],
+            aggregateMaxMarks: 200,
+            aggregateObtainedMarks: 140,
+          ),
+          SubjectAssessment(
+            learningArea: 'DRAWING & SKETCHING',
+            subject: 'ART & CRAFT',
+            assessments: [
+              Assessment(
+                assessmentId: '29',
+                assessmentTitle: 'Mid Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 70,
+              ),
+              Assessment(
+                assessmentId: '30',
+                assessmentTitle: 'Annual Term',
+                maxMarks: 75,
+                passingMarks: 30,
+                obtainedMarks: 55,
+              ),
+              Assessment(
+                assessmentId: '31',
+                assessmentTitle: 'Preliminary Test (Fall)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 23,
+              ),
+              Assessment(
+                assessmentId: '32',
+                assessmentTitle: 'Preliminary Test (Spring)',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 6,
+              ),
+            ],
+            aggregateMaxMarks: 200,
+            aggregateObtainedMarks: 154,
+          ),
+          SubjectAssessment(
+            learningArea: 'EXTRACURRICULAR ACTIVITY',
+            subject: 'ASSIGNMENT & CLASSROOM ACTIVITY',
+            assessments: [
+              Assessment(
+                assessmentId: '33',
+                assessmentTitle: 'Mid Term',
+                maxMarks: 25,
+                passingMarks: 15,
+                obtainedMarks: 0,
+              ),
+              Assessment(
+                assessmentId: '34',
+                assessmentTitle: 'Annual Term',
+                maxMarks: 25,
+                passingMarks: 0,
+                obtainedMarks: 0,
+              ),
+              Assessment(
+                assessmentId: '35',
+                assessmentTitle: 'Summer Assignment',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 23,
+              ),
+              Assessment(
+                assessmentId: '36',
+                assessmentTitle: 'Winter Assignment',
+                maxMarks: 25,
+                passingMarks: 10,
+                obtainedMarks: 9,
+              ),
+            ],
+            aggregateMaxMarks: 100,
+            aggregateObtainedMarks: 32,
+          ),
         ],
       ),
     ];
-  }
-
-  @override
-  void onClose() {
-    super.onClose();
   }
 }
