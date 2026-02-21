@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -14,7 +12,6 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen>
     with SingleTickerProviderStateMixin {
- 
   String selectedMonth = "February";
   bool isFilterExpanded = false;
   bool isGeneratingPdf = false;
@@ -182,22 +179,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         .where((record) => record["month"] == selectedMonth)
         .toList();
 
-    int presentCount =
-        filteredRecords.where((record) => record["status"] == "Present").length;
-    int absentCount =
-        filteredRecords.where((record) => record["status"] == "Absent").length;
-    int leaveCount =
-        filteredRecords.where((record) => record["status"] == "Leave").length;
+    int presentCount = filteredRecords
+        .where((record) => record["status"] == "Present")
+        .length;
+    int absentCount = filteredRecords
+        .where((record) => record["status"] == "Absent")
+        .length;
+    int leaveCount = filteredRecords
+        .where((record) => record["status"] == "Leave")
+        .length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Attendance"),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text("Attendance"), centerTitle: true),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Filter and Generate PDF Buttons (Matching Marksheet Style)
+            // Filter and Generate PDF Buttons
             _buildActionButtons(context),
 
             // Expandable Filter Section
@@ -209,7 +206,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Statistics Cards (Unchanged)
+                  // Statistics Cards
                   Row(
                     children: [
                       Expanded(
@@ -218,7 +215,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           icon: Icons.check_circle,
                           label: "Present",
                           count: presentCount,
-                          color: Colors.green,
+                          color: const Color(0xFF10B981),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -228,7 +225,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           icon: Icons.cancel,
                           label: "Absent",
                           count: absentCount,
-                          color: Colors.red,
+                          color: const Color(0xFFEF4444),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -238,7 +235,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           icon: Icons.event_busy,
                           label: "Leave",
                           count: leaveCount,
-                          color: Colors.orange,
+                          color: const Color(0xFFF59E0B),
                         ),
                       ),
                     ],
@@ -252,15 +249,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Icon(
                         Icons.history,
                         color: Theme.of(context).colorScheme.primary,
-                        size: 28,
+                        size: 24,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         "Daily Records",
-                        style: TextStyle(
-                          fontSize: 22,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -268,145 +263,128 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
                   const SizedBox(height: 16),
 
-                  // Records List (Unchanged)
-                  Container(
-                    height: 400,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Theme.of(context).dividerColor,
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              Theme.of(context).shadowColor.withOpacity(0.08),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: filteredRecords.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inbox,
-                                  size: 64,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withOpacity(0.3),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  "No Records for This Month",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.6),
+                  // Records List
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox(
+                      height: 400,
+                      child: filteredRecords.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.inbox,
+                                    size: 48,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.3),
                                   ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: filteredRecords.length,
-                            separatorBuilder: (context, index) => Divider(
-                              color: Theme.of(context).dividerColor,
-                              height: 1,
-                            ),
-                            itemBuilder: (context, index) {
-                              final record = filteredRecords[index];
-                              Color statusColor;
-                              IconData statusIcon;
-
-                              if (record["status"] == "Present") {
-                                statusColor = Colors.green;
-                                statusIcon = Icons.check_circle;
-                              } else if (record["status"] == "Absent") {
-                                statusColor = Colors.red;
-                                statusIcon = Icons.cancel;
-                              } else {
-                                statusColor = Colors.orange;
-                                statusIcon = Icons.event_busy;
-                              }
-
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 8,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today,
-                                          size: 18,
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    "No Records for This Month",
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(
                                           color: Theme.of(context)
                                               .colorScheme
                                               .onSurface
                                               .withOpacity(0.6),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          record["date"]!,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: statusColor.withOpacity(0.3),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filteredRecords.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final record = filteredRecords[index];
+                                Color statusColor;
+                                IconData statusIcon;
+
+                                if (record["status"] == "Present") {
+                                  statusColor = const Color(0xFF10B981);
+                                  statusIcon = Icons.check_circle;
+                                } else if (record["status"] == "Absent") {
+                                  statusColor = const Color(0xFFEF4444);
+                                  statusIcon = Icons.cancel;
+                                } else {
+                                  statusColor = const Color(0xFFF59E0B);
+                                  statusIcon = Icons.event_busy;
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                    horizontal: 8,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
                                         children: [
                                           Icon(
-                                            statusIcon,
-                                            size: 16,
-                                            color: statusColor,
+                                            Icons.calendar_today,
+                                            size: 18,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.6),
                                           ),
-                                          const SizedBox(width: 6),
+                                          const SizedBox(width: 12),
                                           Text(
-                                            record["status"]!,
-                                            style: TextStyle(
-                                              color: statusColor,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
+                                            record["date"]!,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              statusIcon,
+                                              size: 14,
+                                              color: statusColor,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              record["status"]!,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: statusColor,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 ],
               ),
@@ -419,20 +397,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   /// Build Action Buttons (Filter and Generate PDF)
   Widget _buildActionButtons(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[900] : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: Theme.of(context).colorScheme.surface,
       child: Row(
         children: [
           // Filter Button
@@ -446,21 +413,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               icon: Icon(
                 Icons.filter_alt,
                 size: 20,
-                color: Colors.blue[700],
+                color: Theme.of(context).colorScheme.primary,
               ),
               label: Text(
                 'Filter',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: isDarkMode ? Colors.blue[300] : Colors.blue[700],
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 side: BorderSide(
-                  color: isDarkMode ? Colors.blue[300]! : Colors.blue[700]!,
-                  width: 1.5,
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -474,28 +441,31 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             child: ElevatedButton.icon(
               onPressed: isGeneratingPdf ? null : _generatePdf,
               icon: isGeneratingPdf
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     )
-                  : const Icon(Icons.picture_as_pdf, size: 20),
+                  : Icon(
+                      Icons.picture_as_pdf,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
               label: Text(
                 isGeneratingPdf ? 'Generating...' : 'Generate PDF',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                backgroundColor:
-                    isDarkMode ? Colors.blue[700] : Colors.blue[600],
-                foregroundColor: Colors.white,
-                elevation: 2,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -531,34 +501,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 child: DropdownButtonFormField<String>(
                   decoration: InputDecoration(
                     labelText: "Select Month",
-                    labelStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerColor,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerColor,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
-                      ),
-                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 10,
-                    ),
                     prefixIcon: Icon(
                       Icons.calendar_month,
                       color: Theme.of(context).colorScheme.primary,
@@ -566,16 +509,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ),
                   value: selectedMonth,
                   isExpanded: true,
-                  dropdownColor: Theme.of(context).colorScheme.surface,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 16,
-                  ),
                   items: months.map((month) {
-                    return DropdownMenuItem(
-                      value: month,
-                      child: Text(month),
-                    );
+                    return DropdownMenuItem(value: month, child: Text(month));
                   }).toList(),
                   onChanged: (value) {
                     setState(() {
@@ -589,7 +524,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  /// Build Stat Card (Unchanged)
+  /// Build Stat Card
   Widget _buildStatCard(
     BuildContext context, {
     required IconData icon,
@@ -597,56 +532,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     required int count,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).dividerColor,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        side: BorderSide(color: Theme.of(context).dividerColor, width: 1),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 4),
+            Text(
+              count.toString(),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            count.toString(),
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -666,12 +587,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           .toList();
 
       // Calculate stats
-      final presentCount =
-          filteredRecords.where((r) => r["status"] == "Present").length;
-      final absentCount =
-          filteredRecords.where((r) => r["status"] == "Absent").length;
-      final leaveCount =
-          filteredRecords.where((r) => r["status"] == "Leave").length;
+      final presentCount = filteredRecords
+          .where((r) => r["status"] == "Present")
+          .length;
+      final absentCount = filteredRecords
+          .where((r) => r["status"] == "Absent")
+          .length;
+      final leaveCount = filteredRecords
+          .where((r) => r["status"] == "Leave")
+          .length;
       final totalDays = filteredRecords.length;
 
       pdf.addPage(
@@ -695,7 +619,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
               // Month & Summary Side by Side
               _buildPdfMonthAndSummary(
-                  presentCount, absentCount, leaveCount, totalDays),
+                presentCount,
+                absentCount,
+                leaveCount,
+                totalDays,
+              ),
               pw.SizedBox(height: 20),
 
               // Attendance Table
@@ -737,7 +665,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   /// Build PDF Header (School Banner)
-  pw.Widget _buildPdfHeader()  {
+  pw.Widget _buildPdfHeader() {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
@@ -791,11 +719,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ],
               ),
               pw.SizedBox(height: 4),
-              pw.Container(
-                width: 300,
-                height: 1,
-                color: PdfColors.grey400,
-              ),
+              pw.Container(width: 300, height: 1, color: PdfColors.grey400),
               pw.SizedBox(height: 4),
               pw.Text(
                 'PLAY GROUP TO MATRIC',
@@ -819,10 +743,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         pw.Center(
           child: pw.Text(
             'ATTENDANCE RECORD',
-            style: pw.TextStyle(
-              fontSize: 20,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
           ),
         ),
         pw.SizedBox(height: 8),
@@ -1031,15 +952,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         children: [
           pw.Text(
             label,
-            style: pw.TextStyle(
-              fontSize: 11,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
           ),
-          pw.Text(
-            value,
-            style: const pw.TextStyle(fontSize: 11),
-          ),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 11)),
         ],
       ),
     );

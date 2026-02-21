@@ -13,6 +13,7 @@ import 'package:school_management_system/dashboard/Drawer_Screens/student_fee_sc
 import 'package:school_management_system/dashboard/sections/dashboard_cards_row/dashboard_cards_row.dart';
 import 'package:school_management_system/dashboard/sections/noticesSection.dart';
 import 'package:school_management_system/dashboard/sections/userIDSection.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../controllers/theme_controller.dart';
 
@@ -35,14 +36,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Widget build(BuildContext context) {
     final ThemeController themeController = Get.find<ThemeController>();
 
-    // CRITICAL: DO NOT set backgroundColor on Scaffold
-    // Let it inherit from theme
     return Scaffold(
       key: _scaffoldKey,
-      // ❌ DO NOT DO THIS: backgroundColor: Colors.white,
-      // ❌ DO NOT DO THIS: backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // ✅ Just leave it empty - it will use the theme automatically
-      
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -52,101 +47,95 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
         title: const Text('Student Dashboard'),
         actions: [
-          // Theme toggle button with Obx for reactive icon
-          Obx(() => IconButton(
-                onPressed: () {
-                  themeController.toggleTheme();
-                  print('Theme toggled! Dark mode: ${themeController.isDarkMode}');
-                },
-                icon: Icon(
-                  themeController.isDarkMode 
-                      ? Icons.light_mode 
-                      : Icons.dark_mode,
-                ),
-                tooltip: themeController.isDarkMode 
-                    ? 'Switch to Light Mode' 
-                    : 'Switch to Dark Mode',
-              )),
-
-          // Sign Out button
+          Obx(
+            () => IconButton(
+              onPressed: () {
+                themeController.toggleTheme();
+              },
+              icon: Icon(
+                themeController.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              ),
+              tooltip: themeController.isDarkMode
+                  ? 'Switch to Light Mode'
+                  : 'Switch to Dark Mode',
+            ),
+          ),
           TextButton(
             onPressed: () async {
               await spClear();
               if (context.mounted) {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const SigninScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const SigninScreen()),
                 );
               }
             },
             child: Text(
               "Sign out",
               style: TextStyle(
-                color: Theme.of(context).appBarTheme.foregroundColor,
-                fontSize: 15,
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
 
       drawer: Drawer(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                    width: 1,
+                  ),
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: Colors.white,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.1),
                     child: Text(
-                      "L",
+                      "S",
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Text(
                     "Student Name",
-                    style: TextStyle(
-                      color: Theme.of(context).appBarTheme.foregroundColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     "student@email.com",
-                    style: TextStyle(
-                      color: Theme.of(context).appBarTheme.foregroundColor?.withOpacity(0.7),
-                      fontSize: 14,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
 
-            // Drawer items
-            ListTile(
-              leading: Icon(
-                Icons.person,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Profile",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            const SizedBox(height: 8),
+
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.user,
+              title: "Profile",
               onTap: () {
                 Navigator.push(
                   context,
@@ -154,19 +143,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 );
               },
             ),
-            const Divider(height: 1),
-
-            ListTile(
-              leading: Icon(
-                Icons.event_available,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Attendance",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.checkCircle,
+              title: "Attendance",
               onTap: () {
                 Navigator.push(
                   context,
@@ -174,79 +154,48 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 );
               },
             ),
-            const Divider(height: 1),
-
-            ListTile(
-              leading: Icon(
-                Icons.grading,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Academic Progress",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.bookOpen,
+              title: "Academic Progress",
               onTap: () {
-                 Navigator.push(
+                Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => MarksheetScreen()),
-                ); 
+                  MaterialPageRoute(builder: (context) => MarksheetScreen()),
+                );
               },
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: Icon(
-                Icons.grading,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Composite Marksheet",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.table,
+              title: "Composite Marksheet",
               onTap: () {
-                 Navigator.push(
+                Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => CompositeMarksheetScreen()),
-                ); 
+                    builder: (context) => CompositeMarksheetScreen(),
+                  ),
+                );
               },
             ),
-            const Divider(height: 1),
-
-            ListTile(
-              leading: Icon(
-                Icons.payments,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Fee Details",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.wallet,
+              title: "Fee Details",
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const StudentFeeScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const StudentFeeScreen(),
+                  ),
                 );
               },
             ),
-            const Divider(height: 1),
-             ListTile(
-              leading: Icon(Icons.notifications_none_outlined,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Notices",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.bell,
+              title: "Notices",
               onTap: () {
                 Navigator.push(
                   context,
@@ -254,17 +203,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 );
               },
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: Icon(Icons.notifications_none_outlined,
-                color: Theme.of(context).iconTheme.color,
-              ),
-              title: Text(
-                "Admit Card",
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
+            _buildDrawerItem(
+              context,
+              icon: LucideIcons.contact,
+              title: "Admit Card",
               onTap: () {
                 Navigator.push(
                   context,
@@ -272,31 +214,56 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 );
               },
             ),
-            const Divider(height: 1),
-
           ],
         ),
       ),
 
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(13),
-          child: Column(
-            children: const [
-              // User ID Section
-              UserIDSection(),
-              SizedBox(height: 15),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 24.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                // User ID Section
+                UserIDSection(),
+                SizedBox(height: 24),
 
-              // Notices Section (Horizontal Scroll)
-              NoticesSection(),
-              SizedBox(height: 20),
+                // Notices Section
+                NoticesSection(),
+                SizedBox(height: 24),
 
-              // Dashboard Cards Row (3 cards)
-              DashboardCardsRow(),
-            ],
+                // Dashboard Cards Row
+                DashboardCardsRow(),
+                SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).iconTheme.color),
+      title: Text(
+        title,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      onTap: onTap,
     );
   }
 }

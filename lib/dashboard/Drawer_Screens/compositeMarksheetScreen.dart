@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:school_management_system/controllers/compositeMarksheetController.dart';
 import 'package:school_management_system/models/compositeMarksheetModel.dart';
-
+import 'package:lucide_icons/lucide_icons.dart';
 
 class CompositeMarksheetScreen extends StatelessWidget {
   const CompositeMarksheetScreen({super.key});
@@ -50,7 +50,7 @@ class CompositeMarksheetScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.error_outline,
+                  LucideIcons.alertCircle,
                   size: 64,
                   color: isDarkMode ? Colors.red[300] : Colors.red,
                 ),
@@ -96,9 +96,7 @@ class CompositeMarksheetScreen extends StatelessWidget {
               if (selected == null)
                 _EmptySelectionCard(isDarkMode: isDarkMode)
               else ...[
-                _StudentInfoCard(
-                  info: selected.studentInfo,
-                ),
+                _StudentInfoCard(info: selected.studentInfo),
                 const SizedBox(height: 12),
                 _CompositeMarksheetTable(marksheet: selected),
               ],
@@ -122,22 +120,24 @@ class _ButtonsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-              child: ElevatedButton.icon(
-                onPressed: controller.toggleFilter,
-                icon: Obx(() => Icon(
-                  controller.isFilterExpanded.value 
-                      ? Icons.filter_alt 
-                      : Icons.filter_alt_outlined,
-                )),
-                label: const Text('Filter'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+          child: ElevatedButton.icon(
+            onPressed: controller.toggleFilter,
+            icon: Obx(
+              () => Icon(
+                controller.isFilterExpanded.value
+                    ? LucideIcons.filter
+                    : LucideIcons.filter,
               ),
             ),
+            label: const Text('Filter'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Obx(() {
@@ -153,15 +153,17 @@ class _ButtonsRow extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.picture_as_pdf, size: 20),
+                  : const Icon(LucideIcons.fileText, size: 20),
               label: const Text('Generate PDF'),
               style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              onPressed: (!canGenerate || isBusy) ? null : controller.generatePdf,
+              ),
+              onPressed: (!canGenerate || isBusy)
+                  ? null
+                  : controller.generatePdf,
             );
           }),
         ),
@@ -202,29 +204,33 @@ class _ExpandableFilterSection extends StatelessWidget {
                 child: Column(
                   children: [
                     if (controller.availableYears.isNotEmpty)
-                      Obx(() => DropdownButtonFormField<String>(
-                            value: controller.selectedYear.value,
-                            decoration: InputDecoration(
-                              labelText: 'Academic Year',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor:
-                                  isDarkMode ? Colors.grey[800] : Colors.white,
+                      Obx(
+                        () => DropdownButtonFormField<String>(
+                          value: controller.selectedYear.value,
+                          decoration: InputDecoration(
+                            labelText: 'Academic Year',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            dropdownColor:
-                                isDarkMode ? Colors.grey[800] : Colors.white,
-                            items: controller.availableYears.map((year) {
-                              return DropdownMenuItem(
-                                value: year,
-                                child: Text(year),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              if (value != null) controller.filterByYear(value);
-                            },
-                          )),
+                            filled: true,
+                            fillColor: isDarkMode
+                                ? Colors.grey[800]
+                                : Colors.white,
+                          ),
+                          dropdownColor: isDarkMode
+                              ? Colors.grey[800]
+                              : Colors.white,
+                          items: controller.availableYears.map((year) {
+                            return DropdownMenuItem(
+                              value: year,
+                              child: Text(year),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) controller.filterByYear(value);
+                          },
+                        ),
+                      ),
                   ],
                 ),
               )
@@ -250,7 +256,7 @@ class _EmptySelectionCard extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              Icons.info_outline,
+              LucideIcons.info,
               color: isDarkMode ? Colors.blue[200] : Colors.blue[700],
             ),
             const SizedBox(width: 12),
@@ -307,9 +313,7 @@ class _StudentInfoCard extends StatelessWidget {
                           Expanded(
                             child: _PercentageBlock(value: percentageText),
                           ),
-                          Expanded(
-                            child: _GradeBlock(value: info.grade),
-                          ),
+                          Expanded(child: _GradeBlock(value: info.grade)),
                         ],
                       ),
                     ],
@@ -444,10 +448,7 @@ class _GradeBlock extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.blue[100],
             borderRadius: BorderRadius.circular(8),
@@ -485,9 +486,7 @@ class _CompositeMarksheetTable extends StatelessWidget {
         rows.add(
           DataRow(
             cells: [
-              DataCell(
-                Text(isFirst ? subjectAssessment.learningArea : ''),
-              ),
+              DataCell(Text(isFirst ? subjectAssessment.learningArea : '')),
               DataCell(
                 Text(
                   isFirst ? subjectAssessment.subject : '',
@@ -504,7 +503,9 @@ class _CompositeMarksheetTable extends StatelessWidget {
                 Center(child: Text(assessment.passingMarks.toStringAsFixed(0))),
               ),
               DataCell(
-                Center(child: Text(assessment.obtainedMarks.toStringAsFixed(0))),
+                Center(
+                  child: Text(assessment.obtainedMarks.toStringAsFixed(0)),
+                ),
               ),
               DataCell(
                 isLast
@@ -545,16 +546,16 @@ class _CompositeMarksheetTable extends StatelessWidget {
     return Card(
       elevation: 2,
       color: isDarkMode ? Colors.grey[850] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 600;
           final columnSpacing = isMobile ? 10.0 : 20.0;
           final horizontalMargin = isMobile ? 8.0 : 16.0;
-          final availableTableWidth =
-              (constraints.maxWidth - 24).clamp(0.0, double.infinity);
+          final availableTableWidth = (constraints.maxWidth - 24).clamp(
+            0.0,
+            double.infinity,
+          );
 
           return Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -563,7 +564,10 @@ class _CompositeMarksheetTable extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: availableTableWidth),
                 child: DataTable(
-                  border: TableBorder.all(color: borderColor, width: 1),
+                  border: TableBorder(
+                    horizontalInside: BorderSide(color: borderColor, width: 1),
+                    bottom: BorderSide(color: borderColor, width: 1),
+                  ),
                   headingRowColor: MaterialStateProperty.all(
                     isDarkMode ? Colors.grey[800] : Colors.grey[200],
                   ),
