@@ -59,18 +59,37 @@ class StudentFeeController extends GetxController {
 
   void _loadDropdownOptions() {
     // Replace with API: fetchDepartments(), fetchSessionYears(), etc.
-    departments.value = ['Computer Science', 'Mathematics', 'Physics', 'Chemistry'];
+    departments.value = [
+      'Computer Science',
+      'Mathematics',
+      'Physics',
+      'Chemistry',
+    ];
     sessionYears.value = ['2024-25', '2023-24', '2022-23'];
     months.value = List.generate(12, (i) => _monthName(i + 1));
     yearFeeOptions.value = ['2024', '2023', '2022'];
     if (departments.isNotEmpty) selectedDepartment.value = departments.first;
     if (sessionYears.isNotEmpty) selectedSessionYear.value = sessionYears.first;
-    if (months.isNotEmpty) selectedMonth.value = months[DateTime.now().month - 1];
+    if (months.isNotEmpty)
+      selectedMonth.value = months[DateTime.now().month - 1];
     if (yearFeeOptions.isNotEmpty) selectedYearFee.value = yearFeeOptions.first;
   }
 
   String _monthName(int m) {
-    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const names = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return names[m - 1];
   }
 
@@ -220,7 +239,9 @@ class StudentFeeController extends GetxController {
     } else {
       selectedStudent.value = StudentFeeModel(
         studentId: id,
-        studentName: studentNameController.text.trim().isEmpty ? 'Student $id' : studentNameController.text.trim(),
+        studentName: studentNameController.text.trim().isEmpty
+            ? 'Student $id'
+            : studentNameController.text.trim(),
         department: selectedDepartment.value,
         tuitionFee: 5000,
         imageUrl: null,
@@ -228,7 +249,9 @@ class StudentFeeController extends GetxController {
     }
   }
 
-  Future<(List<String>, List<FeeRecord>)> _simulateSearchMonthly(FeeSearchFilter filter) async {
+  Future<(List<String>, List<FeeRecord>)> _simulateSearchMonthly(
+    FeeSearchFilter filter,
+  ) async {
     await Future.delayed(const Duration(milliseconds: 400));
     final year = filter.year.split('-').first;
     final unpaid = ['January $year', 'February $year', 'March $year'];
@@ -255,7 +278,9 @@ class StudentFeeController extends GetxController {
     return (unpaid, paid);
   }
 
-  Future<(List<String>, List<FeeRecord>)> _simulateSearchYearly(FeeSearchFilter filter) async {
+  Future<(List<String>, List<FeeRecord>)> _simulateSearchYearly(
+    FeeSearchFilter filter,
+  ) async {
     await Future.delayed(const Duration(milliseconds: 400));
     final year = filter.year;
     final unpaid = ['Annual Fee $year'];
@@ -273,7 +298,8 @@ class StudentFeeController extends GetxController {
     return (unpaid, paid);
   }
 
-  Future<(StudentFeeModel, List<String>, List<FeeRecord>)?> _simulateSearchByReceipt(String receipt) async {
+  Future<(StudentFeeModel, List<String>, List<FeeRecord>)?>
+  _simulateSearchByReceipt(String receipt) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return (
       StudentFeeModel(
@@ -326,7 +352,10 @@ class StudentFeeController extends GetxController {
           _buildPdfStudentInfo(student),
           pw.SizedBox(height: 20),
           if (unpaidMonths.isNotEmpty) ...[
-            pw.Text('Unpaid Months', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Unpaid Months',
+              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 4),
             pw.Container(
               padding: const pw.EdgeInsets.all(8),
@@ -334,11 +363,17 @@ class StudentFeeController extends GetxController {
                 border: pw.Border.all(color: PdfColors.red),
                 color: PdfColors.red50,
               ),
-              child: pw.Text(unpaidMonths.join(', '), style: const pw.TextStyle(fontSize: 10)),
+              child: pw.Text(
+                unpaidMonths.join(', '),
+                style: const pw.TextStyle(fontSize: 10),
+              ),
             ),
             pw.SizedBox(height: 16),
           ],
-          pw.Text('Fee Records', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Fee Records',
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 8),
           _buildPdfFeeTable(),
         ],
@@ -357,13 +392,23 @@ class StudentFeeController extends GetxController {
             pw.Container(
               width: 60,
               height: 60,
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black)),
-              child: pw.Center(child: pw.Text('Logo', style: pw.TextStyle(fontSize: 8))),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black),
+              ),
+              child: pw.Center(
+                child: pw.Text('Logo', style: pw.TextStyle(fontSize: 8)),
+              ),
             ),
             pw.Expanded(
               child: pw.Column(
                 children: [
-                  pw.Text('School Name', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    'School Name',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
                   pw.SizedBox(height: 2),
                   pw.Text('School Address', style: pw.TextStyle(fontSize: 10)),
                 ],
@@ -372,14 +417,21 @@ class StudentFeeController extends GetxController {
             pw.Container(
               width: 50,
               height: 60,
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black)),
-              child: pw.Center(child: pw.Text('Photo', style: pw.TextStyle(fontSize: 8))),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black),
+              ),
+              child: pw.Center(
+                child: pw.Text('Photo', style: pw.TextStyle(fontSize: 8)),
+              ),
             ),
           ],
         ),
         pw.SizedBox(height: 8),
         pw.Center(
-          child: pw.Text('Fee Receipt / Fee Report', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          child: pw.Text(
+            'Fee Receipt / Fee Report',
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
         ),
         pw.Divider(),
       ],
@@ -389,7 +441,10 @@ class StudentFeeController extends GetxController {
   pw.Widget _buildPdfStudentInfo(StudentFeeModel student) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black),
-      columnWidths: {0: const pw.FlexColumnWidth(2), 1: const pw.FlexColumnWidth(3)},
+      columnWidths: {
+        0: const pw.FlexColumnWidth(2),
+        1: const pw.FlexColumnWidth(3),
+      },
       children: [
         _pdfTableRow('Student ID', student.studentId),
         _pdfTableRow('Student Name', student.studentName),
@@ -404,7 +459,10 @@ class StudentFeeController extends GetxController {
       children: [
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
-          child: pw.Text(label, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
@@ -415,7 +473,14 @@ class StudentFeeController extends GetxController {
   }
 
   pw.Widget _buildPdfFeeTable() {
-    final headers = ['Year', 'Month', 'Details', 'Amount', 'Fee Date', 'Receipt No'];
+    final headers = [
+      'Year',
+      'Month',
+      'Details',
+      'Amount',
+      'Fee Date',
+      'Receipt No',
+    ];
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black),
       columnWidths: {
@@ -429,21 +494,63 @@ class StudentFeeController extends GetxController {
       children: [
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          children: headers.map((h) => pw.Padding(
-            padding: const pw.EdgeInsets.all(6),
-            child: pw.Text(h, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-          )).toList(),
+          children: headers
+              .map(
+                (h) => pw.Padding(
+                  padding: const pw.EdgeInsets.all(6),
+                  child: pw.Text(
+                    h,
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
-        ...paidFees.map((r) => pw.TableRow(
-          children: [
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(r.year, style: const pw.TextStyle(fontSize: 9))),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(r.month, style: const pw.TextStyle(fontSize: 9))),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(r.details, style: const pw.TextStyle(fontSize: 9))),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(r.amount.toStringAsFixed(0), style: const pw.TextStyle(fontSize: 9))),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${r.feeDate.day}/${r.feeDate.month}/${r.feeDate.year}', style: const pw.TextStyle(fontSize: 9))),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(r.receiptNo, style: const pw.TextStyle(fontSize: 9))),
-          ],
-        )),
+        ...paidFees.map(
+          (r) => pw.TableRow(
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(r.year, style: const pw.TextStyle(fontSize: 9)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(r.month, style: const pw.TextStyle(fontSize: 9)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(
+                  r.details,
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(
+                  r.amount.toStringAsFixed(0),
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(
+                  '${r.feeDate.day}/${r.feeDate.month}/${r.feeDate.year}',
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(
+                  r.receiptNo,
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -453,7 +560,12 @@ class StudentFeeController extends GetxController {
       children: [
         pw.Divider(),
         pw.SizedBox(height: 4),
-        pw.Center(child: pw.Text('Powered by KI Software Solutions', style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic))),
+        pw.Center(
+          child: pw.Text(
+            'Powered by KI Software Solutions',
+            style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic),
+          ),
+        ),
       ],
     );
   }

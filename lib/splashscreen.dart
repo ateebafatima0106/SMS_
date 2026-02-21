@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_management_system/authentication_screens/signin.dart';
 
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -13,7 +12,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -21,11 +19,12 @@ class _SplashScreenState extends State<SplashScreen> {
       navigateNext();
     });
   }
+
   void navigateNext() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
-    if (!mounted) return; 
+    if (!mounted) return;
     if (isLoggedIn) {
       Navigator.pushReplacement(
         context,
@@ -45,9 +44,20 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         height: double.infinity,
         width: double.infinity,
-        color: Colors.purple,
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
+        color: Colors.white,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset('assets/benchmark-logo.jpeg', height: 200, width: 200),
+            SizedBox(height: 20),
+            SizedBox(
+              width: 180,
+              child: LinearProgressIndicator(
+                backgroundColor: Colors.white,
+                color: Colors.black,
+              ),
+            ),
+          ],
         ),
       ),
     );

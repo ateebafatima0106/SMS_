@@ -35,13 +35,13 @@ class CompositeMarksheetController extends GetxController {
       // Simulate API delay
       await Future.delayed(const Duration(milliseconds: 800));
 
-      // Using dummy data
+      // Using dummy data for now
       yearlyMarks.value = _getDummyData();
 
       // Extract available years
       availableYears.value =
           yearlyMarks.map((m) => m.academicYear).toSet().toList()
-            ..sort((a, b) => b.compareTo(a));
+            ..sort((a, b) => b.compareTo(a)); // Latest first
 
       if (availableYears.isNotEmpty) {
         selectedYear.value = availableYears.first;
@@ -59,14 +59,24 @@ class CompositeMarksheetController extends GetxController {
     }
   }
 
+  /// Select a marksheet to view details
   void selectMarksheet(CompositeMarksheetModel marksheet) {
     selectedMarksheet.value = marksheet;
     marksheetData.value = marksheet;
   }
 
+  /// Filter by year
   void filterByYear(String year) {
     selectedYear.value = year;
     _setCurrentMarksheetForSelectedYear();
+  }
+
+  /// Get filtered marksheets
+  List<CompositeMarksheetModel> get filteredMarksheets {
+    if (selectedYear.value == null) return yearlyMarks;
+    return yearlyMarks
+        .where((m) => m.academicYear == selectedYear.value)
+        .toList();
   }
 
   void _setCurrentMarksheetForSelectedYear() {
@@ -80,6 +90,7 @@ class CompositeMarksheetController extends GetxController {
       return;
     }
 
+    // If multiple exist for a year, prefer most recent.
     byYear.sort((a, b) {
       final aTs = a.createdAt?.millisecondsSinceEpoch ?? 0;
       final bTs = b.createdAt?.millisecondsSinceEpoch ?? 0;
@@ -106,13 +117,15 @@ class CompositeMarksheetController extends GetxController {
 
     try {
       isGeneratingPdf.value = true;
+
+      final pdf = pw.Document();
       final marksheet = selectedMarksheet.value!;
 
       // Load fonts
       final robotoRegular = await PdfGoogleFonts.robotoRegular();
       final robotoBold = await PdfGoogleFonts.robotoBold();
 
-      // Load student photo
+      // Load student photo if available
       pw.ImageProvider? studentPhoto;
       if (marksheet.studentInfo.photoUrl != null &&
           marksheet.studentInfo.photoUrl!.isNotEmpty) {
@@ -123,40 +136,41 @@ class CompositeMarksheetController extends GetxController {
         }
       }
 
-      final pdf = pw.Document();
-
+      // Add page to PDF
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(30),
-          build: (context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                _buildPdfHeader(marksheet, studentPhoto, robotoBold),
-                pw.SizedBox(height: 20),
-                _buildPdfStudentInfoTable(
-                  marksheet.studentInfo,
-                  robotoRegular,
-                  robotoBold,
-                ),
-                pw.SizedBox(height: 20),
-                _buildPdfAssessmentsTable(marksheet, robotoRegular, robotoBold),
-                pw.Spacer(),
-                _buildPdfFooter(robotoRegular),
-              ],
-            );
-          },
+          build: (context) => [
+            _buildPdfHeader(marksheet, studentPhoto, robotoBold),
+            pw.SizedBox(height: 16),
+            _buildPdfStudentInfo(
+              marksheet.studentInfo,
+              robotoRegular,
+              robotoBold,
+            ),
+            pw.SizedBox(height: 16),
+            _buildPdfTable(marksheet, robotoRegular, robotoBold),
+            pw.SizedBox(height: 30),
+            _buildPdfFooter(robotoRegular),
+          ],
         ),
       );
 
+      // Save and share PDF
       await Printing.sharePdf(
         bytes: await pdf.save(),
         filename:
             'Transcript_${marksheet.studentInfo.studentName.replaceAll(' ', '_')}_${marksheet.academicYear}.pdf',
       );
+
+      Get.snackbar(
+        'Success',
+        'PDF generated successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+      );
     } catch (e) {
-      print('PDF Generation Error: $e');
       Get.snackbar(
         'Error',
         'Failed to generate PDF: ${e.toString()}',
@@ -167,42 +181,63 @@ class CompositeMarksheetController extends GetxController {
     }
   }
 
+  /// Build PDF header
   pw.Widget _buildPdfHeader(
     CompositeMarksheetModel marksheet,
     pw.ImageProvider? photo,
     pw.Font boldFont,
   ) {
     return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.SizedBox(width: 80), // Spacer for centering
-        pw.Column(
-          children: [
-            pw.Text(
-              'TRANSCRIPT',
-              style: pw.TextStyle(font: boldFont, fontSize: 24),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              'FOR THE ACADEMIC YEAR ${marksheet.academicYear}',
-              style: pw.TextStyle(font: boldFont, fontSize: 16),
-            ),
-          ],
+        pw.Expanded(flex: 1, child: pw.SizedBox()),
+        pw.Expanded(
+          flex: 4,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                'TRANSCRIPT',
+                style: pw.TextStyle(
+                  font: boldFont,
+                  fontSize: 26,
+                  color: PdfColors.black,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                'FOR THE ACADEMIC YEAR ${marksheet.academicYear}',
+                style: pw.TextStyle(
+                  font: boldFont,
+                  fontSize: 16,
+                  color: PdfColors.black,
+                ),
+              ),
+            ],
+          ),
         ),
-        pw.Container(
-          width: 80,
-          height: 100,
-          decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
-          child: photo != null
-              ? pw.Image(photo, fit: pw.BoxFit.cover)
-              : pw.SizedBox(),
+        pw.Expanded(
+          flex: 1,
+          child: pw.Align(
+            alignment: pw.Alignment.topRight,
+            child: pw.Container(
+              width: 80,
+              height: 100,
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1.5),
+              ),
+              child: photo != null
+                  ? pw.Image(photo, fit: pw.BoxFit.cover)
+                  : pw.SizedBox(),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  pw.Widget _buildPdfStudentInfoTable(
+  /// Build PDF student info section using pw.Table for stability
+  pw.Widget _buildPdfStudentInfo(
     StudentInfo info,
     pw.Font regFont,
     pw.Font boldFont,
@@ -212,71 +247,74 @@ class CompositeMarksheetController extends GetxController {
       columnWidths: {
         0: const pw.FlexColumnWidth(1.2),
         1: const pw.FlexColumnWidth(3),
-        2: const pw.FlexColumnWidth(1),
-        3: const pw.FlexColumnWidth(1),
+        2: const pw.FlexColumnWidth(0.8),
+        3: const pw.FlexColumnWidth(0.8),
         4: const pw.FlexColumnWidth(2),
       },
       children: [
         pw.TableRow(
           children: [
-            _infoCell('Student\'s\nName', boldFont, alignLeft: true),
-            _infoCell(info.studentName.toUpperCase(), regFont),
-            _infoCell('Std. Id', boldFont),
-            _infoCell('Class', boldFont),
-            _infoCell(info.className.toUpperCase(), regFont),
+            _tableInfoCell('Student\'s\nName', boldFont, alignLeft: true),
+            _tableInfoCell(info.studentName.toUpperCase(), regFont),
+            _tableInfoCell('Std. Id', boldFont),
+            _tableInfoCell('Class', boldFont),
+            _tableInfoCell(info.className.toUpperCase(), regFont),
           ],
         ),
         pw.TableRow(
           children: [
-            _infoCell('Father\'s\nName', boldFont, alignLeft: true),
-            _infoCell(info.fatherName.toUpperCase(), regFont),
-            _infoCell(info.studentId, regFont),
-            _infoCell('Roll #', boldFont),
-            _infoCell(info.rollNo, regFont),
+            _tableInfoCell('Father\'s\nName', boldFont, alignLeft: true),
+            _tableInfoCell(info.fatherName.toUpperCase(), regFont),
+            _tableInfoCell(info.studentId, regFont),
+            _tableInfoCell('Roll #', boldFont),
+            _tableInfoCell(info.rollNo, regFont),
           ],
         ),
         pw.TableRow(
           children: [
-            _infoCell('Result', boldFont, alignLeft: true),
-            _infoCell(info.result.toUpperCase(), regFont),
-            _infoCell('Max.\nMarks', boldFont),
-            _infoCell(info.totalMaxMarks.toStringAsFixed(0), regFont),
-            _infoCell('Percentage', boldFont),
-            _infoCell('${info.percentage.toStringAsFixed(2)} %', regFont),
+            _tableInfoCell('Result', boldFont, alignLeft: true),
+            _tableInfoCell(info.result.toUpperCase(), regFont),
+            _tableInfoCell('Max.\nMarks', boldFont),
+            _tableInfoCell(info.totalMaxMarks.toStringAsFixed(0), regFont),
+            _tableInfoCell('Percentage', boldFont),
+            _tableInfoCell('${info.percentage.toStringAsFixed(2)} %', regFont),
           ],
         ),
         pw.TableRow(
           children: [
-            _infoCell('Position', boldFont, alignLeft: true),
-            _infoCell(
+            _tableInfoCell('Position', boldFont, alignLeft: true),
+            _tableInfoCell(
               info.position.isEmpty ? " " : info.position.toUpperCase(),
               regFont,
             ),
-            _infoCell('Obt.\nMarks', boldFont),
-            _infoCell(info.totalObtainedMarks.toStringAsFixed(0), regFont),
-            _infoCell('Grade', boldFont),
-            _infoCell(info.grade.toUpperCase(), regFont),
+            _tableInfoCell('Obt.\nMarks', boldFont),
+            _tableInfoCell(info.totalObtainedMarks.toStringAsFixed(0), regFont),
+            _tableInfoCell('Grade', boldFont),
+            _tableInfoCell(info.grade.toUpperCase(), regFont),
           ],
         ),
       ],
     );
   }
 
-  pw.Widget _infoCell(String text, pw.Font font, {bool alignLeft = false}) {
-    return pw.Padding(
+  pw.Widget _tableInfoCell(
+    String text,
+    pw.Font font, {
+    bool alignLeft = false,
+  }) {
+    return pw.Container(
+      alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
       padding: const pw.EdgeInsets.all(6),
-      child: pw.Align(
-        alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
-        child: pw.Text(
-          text,
-          textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
-          style: pw.TextStyle(font: font, fontSize: 9),
-        ),
+      child: pw.Text(
+        text,
+        textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
+        style: pw.TextStyle(font: font, fontSize: 8.5),
       ),
     );
   }
 
-  pw.Widget _buildPdfAssessmentsTable(
+  /// Build PDF table with all assessments using nested tables for perfect cross-row look
+  pw.Widget _buildPdfTable(
     CompositeMarksheetModel marksheet,
     pw.Font regFont,
     pw.Font boldFont,
@@ -286,7 +324,7 @@ class CompositeMarksheetController extends GetxController {
       columnWidths: {
         0: const pw.FlexColumnWidth(1.8), // Learning Area
         1: const pw.FlexColumnWidth(1.8), // Subject
-        2: const pw.FlexColumnWidth(4.9), // Assessment Title, Max, Passing, Obt
+        2: const pw.FlexColumnWidth(4.9), // Assessment Title + Marks
         3: const pw.FlexColumnWidth(1.2), // Agg. Marks
       },
       children: [
@@ -297,10 +335,7 @@ class CompositeMarksheetController extends GetxController {
             _headerCell('Learning Area', boldFont),
             _headerCell('Subject', boldFont),
             pw.Table(
-              border: const pw.TableBorder(
-                left: pw.BorderSide(width: 1),
-                right: pw.BorderSide(width: 1),
-              ),
+              border: pw.TableBorder.all(width: 1),
               columnWidths: {
                 0: const pw.FlexColumnWidth(2.5), // Title
                 1: const pw.FlexColumnWidth(0.8), // Max
@@ -329,11 +364,7 @@ class CompositeMarksheetController extends GetxController {
               _dataCell(sa.subject.toUpperCase(), boldFont),
               // Nested table for assessments
               pw.Table(
-                border: const pw.TableBorder(
-                  left: pw.BorderSide(width: 1),
-                  right: pw.BorderSide(width: 1),
-                  horizontalInside: pw.BorderSide(width: 1),
-                ),
+                border: pw.TableBorder.all(width: 1),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(2.5),
                   1: const pw.FlexColumnWidth(0.8),
@@ -351,7 +382,11 @@ class CompositeMarksheetController extends GetxController {
                   );
                 }).toList(),
               ),
-              _dataCell(sa.aggregateObtainedMarks.toStringAsFixed(0), boldFont),
+              _dataCell(
+                sa.aggregateObtainedMarks.toStringAsFixed(0),
+                boldFont,
+                background: PdfColors.blue50,
+              ),
             ],
           );
         }).toList(),
@@ -360,53 +395,65 @@ class CompositeMarksheetController extends GetxController {
   }
 
   pw.Widget _headerCell(String text, pw.Font font) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.all(5),
-      child: pw.Center(
-        child: pw.Text(
-          text,
-          textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(font: font, fontSize: 9),
-        ),
+    return pw.Container(
+      alignment: pw.Alignment.center,
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(
+        text,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(font: font, fontSize: 9),
       ),
     );
   }
 
-  pw.Widget _dataCell(String text, pw.Font font, {bool alignLeft = false}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.all(5),
-      child: pw.Align(
-        alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
-        child: pw.Text(
-          text,
-          textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
-          style: pw.TextStyle(font: font, fontSize: 8.5),
-        ),
+  pw.Widget _dataCell(
+    String text,
+    pw.Font font, {
+    bool alignLeft = false,
+    PdfColor? background,
+  }) {
+    return pw.Container(
+      color: background,
+      alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(
+        text,
+        textAlign: alignLeft ? pw.TextAlign.left : pw.TextAlign.center,
+        style: pw.TextStyle(font: font, fontSize: 8.5),
       ),
     );
   }
 
+  /// Build PDF footer
   pw.Widget _buildPdfFooter(pw.Font regFont) {
-    return pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        _signatureBox('Class Teacher', regFont),
-        _signatureBox('Principal', regFont),
-        _signatureBox('Parent/Guardian', regFont),
-      ],
-    );
-  }
-
-  pw.Widget _signatureBox(String label, pw.Font font) {
     return pw.Column(
       children: [
-        pw.Container(width: 120, height: 1, color: PdfColors.black),
-        pw.SizedBox(height: 5),
-        pw.Text(label, style: pw.TextStyle(font: font, fontSize: 9)),
+        pw.SizedBox(height: 40),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSignature('Class Teacher', regFont),
+            _buildSignature('Principal', regFont),
+            _buildSignature('Parent/Guardian', regFont),
+          ],
+        ),
       ],
     );
   }
 
+  /// Build signature line
+  pw.Widget _buildSignature(String label, pw.Font regFont) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Container(width: 120, height: 1.5, color: PdfColors.black),
+        pw.SizedBox(height: 4),
+        pw.Text(label, style: pw.TextStyle(font: regFont, fontSize: 9)),
+      ],
+    );
+  }
+
+  /// Get dummy data matching the image structure
   List<CompositeMarksheetModel> _getDummyData() {
     return [
       CompositeMarksheetModel(
@@ -752,5 +799,10 @@ class CompositeMarksheetController extends GetxController {
         ],
       ),
     ];
+  }
+
+  @override
+  void onClose() {
+    super.onClose();
   }
 }
