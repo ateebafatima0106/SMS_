@@ -11,7 +11,10 @@ class NoticesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Notices"), centerTitle: true),
+      appBar: AppBar(
+        title: const Text("Notices"),
+        centerTitle: true,
+      ),
       body: Obx(() {
         if (noticeController.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
@@ -22,8 +25,11 @@ class NoticesScreen extends StatelessWidget {
             child: Text(
               "No notices yet",
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.6),
+                  ),
             ),
           );
         }
@@ -32,30 +38,42 @@ class NoticesScreen extends StatelessWidget {
           onRefresh: noticeController.refreshNotices,
           child: ListView.builder(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.all(16),
             itemCount: noticeController.notices.length,
             itemBuilder: (context, index) {
-              final notice = noticeController.notices[index];
+              final NoticeModel notice =
+                  noticeController.notices[index];
 
               return Card(
+                elevation: 2,
                 margin: const EdgeInsets.only(bottom: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ======================
+                      // Title + NEW Badge
+                      // ======================
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
                               notice.title,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ),
-                          if (notice.isNew == true) ...[
+
+                          if (notice.isNew) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -63,54 +81,64 @@ class NoticesScreen extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withOpacity(0.1),
+                                color: Colors.red.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withOpacity(0.3),
-                                  width: 1,
+                                  color: Colors.red.withOpacity(0.4),
                                 ),
                               ),
-                              child: Text(
+                              child: const Text(
                                 "NEW",
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
                               ),
                             ),
                           ],
                         ],
                       ),
+
                       const SizedBox(height: 12),
+
+                      // ======================
+                      // Description
+                      // ======================
                       Text(
                         notice.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.8),
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.8),
+                            ),
                       ),
-                      const SizedBox(height: 16),
+
+                      const SizedBox(height: 14),
+
+                      // ======================
+                      // Date
+                      // ======================
                       Align(
                         alignment: Alignment.bottomRight,
                         child: Text(
                           "${notice.date.day.toString().padLeft(2, '0')}-"
                           "${notice.date.month.toString().padLeft(2, '0')}-"
                           "${notice.date.year}",
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
                               ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.5),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.5),
                               ),
                         ),
                       ),

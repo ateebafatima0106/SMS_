@@ -1,9 +1,11 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:school_management_system/controllers/authController.dart';
 import 'package:school_management_system/dashboard/student_dashboard.dart';
-import 'package:shared_preferences/shared_preferences.dart'; 
 import 'package:school_management_system/authentication_screens/signup_screen.dart';
+
 
 class SigninScreen extends StatefulWidget {
   const SigninScreen({super.key});
@@ -13,20 +15,13 @@ class SigninScreen extends StatefulWidget {
 }
 
 class _SigninScreenState extends State<SigninScreen> {
-  final TextEditingController userID = TextEditingController();
+  final TextEditingController username = TextEditingController();
   final TextEditingController password = TextEditingController();
+
   bool rememberMe = false;
   bool isPasswordVisible = false;
-  
-  void saveLogin() async {
-    final sp = await SharedPreferences.getInstance();
-    if (rememberMe) {
-      await sp.setBool('isLoggedIn', true);
-      await sp.setString('userID', userID.text.trim()); 
-    } else {
-      await sp.setBool('isLoggedIn', false);
-    }
-  }
+
+  final AuthController authController = Get.put(AuthController());
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +52,6 @@ class _SigninScreenState extends State<SigninScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo/Icon
-                    // SCHOOL LOGO IMAGES
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -73,7 +66,6 @@ class _SigninScreenState extends State<SigninScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Title
                     Text(
                       "Welcome Back",
                       style: TextStyle(
@@ -92,69 +84,33 @@ class _SigninScreenState extends State<SigninScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // User ID Field
+                    // USERNAME FIELD
                     TextField(
-                      controller: userID,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                      controller: username,
                       decoration: InputDecoration(
-                        labelText: "User ID",
-                        labelStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.person_outline,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        labelText: "Username",
+                        prefixIcon: Icon(Icons.person_outline,
+                            color: Theme.of(context).colorScheme.primary),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Password Field
+                    // PASSWORD FIELD
                     TextField(
                       controller: password,
                       obscureText: !isPasswordVisible,
                       obscuringCharacter: "•",
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
                       decoration: InputDecoration(
                         labelText: "Password",
-                        labelStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.lock_outline,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        prefixIcon: Icon(Icons.lock_outline,
+                            color: Theme.of(context).colorScheme.primary),
                         suffixIcon: IconButton(
                           icon: Icon(
                             isPasswordVisible
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                           ),
                           onPressed: () {
                             setState(() {
@@ -163,31 +119,11 @@ class _SigninScreenState extends State<SigninScreen> {
                           },
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Remember Me & Forgot Password
                     Row(
                       children: [
                         Checkbox(
@@ -196,117 +132,110 @@ class _SigninScreenState extends State<SigninScreen> {
                             setState(() {
                               rememberMe = value ?? false;
                             });
+                            authController.rememberMe.value = rememberMe;
                           },
-                          activeColor: Theme.of(context).colorScheme.primary,
-                          
                         ),
-                        Text(
-                          "Remember me",
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
+                        const Text("Remember me"),
                         const Spacer(),
-                        TextButton(
+                      /* TextButton(
                           onPressed: () {},
-                          child: Text(
-                            "Forgot Password?",
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                          child: const Text("Forgot Password?"),
+                        ),*/
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    // Login Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    // LOGIN BUTTON
+                    Obx(() => SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: authController.isLoading.value
+                                ? null
+                                : () async {
+                                    final username_ =
+                                        username.text.trim();
+                                    final password_ =
+                                        password.text.trim();
+
+                                    if (username_.isEmpty ||
+                                        password_.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                              "Please complete all required fields."),
+                                          backgroundColor:
+                                              Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    bool success =
+                                        await authController.login(
+                                            username_, password_);
+
+                                    if (success) {
+                                      username.clear();
+                                      password.clear();
+
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentDashboard(),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              authController.errorMessage.value),
+                                          backgroundColor:
+                                              Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                        ),
+                                      );
+                                    }
+                                  },
+                            child: authController.isLoading.value
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : const Text(
+                                    "Login",
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600),
+                                  ),
                           ),
-                          elevation: 2,
-                          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                        ),
-                        onPressed: () async {
-                          final userID_ = userID.text.trim();
-                          final password_ = password.text.trim();
+                        )),
 
-                          if (userID_.isEmpty || password_.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text("Please complete all required fields."),
-                                backgroundColor: Theme.of(context).colorScheme.error,
-                              ),
-                            );
-                            return;
-                          }
-
-                          saveLogin();
-                          userID.clear();
-                          password.clear();
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text("Login Successful!"),
-                              backgroundColor: Colors.blue,
-                            ),
-                          );
-
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const StudentDashboard(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          "Login",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 24),
-
-                    // Signup Redirect
+  /*
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          "Don't have an account?",
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                          ),
-                        ),
+                        const Text("Don't have an account?"),
                         TextButton(
                           onPressed: () {
-                            Navigator.push(
+                           /* Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const SignupScreen(),
+                                builder: (context) =>
+                                    const SignupScreen(),
                               ),
-                            );
+                            );*/
                           },
-                          child: Text(
-                            "Sign Up",
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: const Text("Sign Up"),
                         ),
                       ],
-                    ),
+                    ),*/
                   ],
                 ),
               ),

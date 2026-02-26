@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:school_management_system/authentication_screens/changePasswordScreen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -188,11 +191,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.lock_reset,
                     label: 'Change Password',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Change Password clicked'),
-                        ),
-                      );
+                       Get.to(() => ChangePasswordScreen());
+                      
+                    
                     },
                     isPrimary: true,
                   ),

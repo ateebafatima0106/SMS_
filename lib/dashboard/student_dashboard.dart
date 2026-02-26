@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:school_management_system/authentication_screens/signin.dart';
+import 'package:school_management_system/controllers/noticeController.dart';
+import 'package:school_management_system/controllers/singleMarksheetController.dart';
 import 'package:school_management_system/dashboard/Drawer_Screens/NoticesScreen.dart';
 import 'package:school_management_system/dashboard/Drawer_Screens/admitcardScreen.dart';
 
@@ -159,10 +161,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
               icon: LucideIcons.bookOpen,
               title: "Academic Progress",
               onTap: () {
-                Navigator.push(
+                /*Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => MarksheetScreen()),
-                );
+                ); */
               },
             ),
             _buildDrawerItem(
@@ -197,10 +199,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
               icon: LucideIcons.bell,
               title: "Notices",
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => NoticesScreen()),
-                );
+              Get.to(() => NoticesScreen());
+  // Manually trigger a refresh if the list is empty
+  if (Get.find<NoticesController>().notices.isEmpty) {
+    Get.find<NoticesController>().fetchNoticesApi();
+  }
               },
             ),
             _buildDrawerItem(

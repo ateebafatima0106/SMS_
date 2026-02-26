@@ -1,7 +1,10 @@
 // ignore_for_file: deprecated_member_use
-
+/*
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:school_management_system/authentication_screens/signin.dart';
+import 'package:school_management_system/controllers/authController.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -11,13 +14,26 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final TextEditingController userID = TextEditingController();
-  final TextEditingController name = TextEditingController();
+  final TextEditingController username = TextEditingController();
+  final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
   final TextEditingController confirmPassword = TextEditingController();
+  final TextEditingController fatherName = TextEditingController();
+  final TextEditingController fatherPhone= TextEditingController();
+  final TextEditingController dob = TextEditingController();
+ final TextEditingController deptID = TextEditingController();
+ final TextEditingController classID = TextEditingController();
+ final TextEditingController phone = TextEditingController();
+ final TextEditingController cnic = TextEditingController();
+ final TextEditingController address = TextEditingController();
+ final TextEditingController gender = TextEditingController();
+final TextEditingController section = TextEditingController();
+final TextEditingController year = TextEditingController();
 
   bool isPasswordVisible = false;
   bool isConfPasswordVisible = false;
+
+  final AuthController authController = Get.put(AuthController());
 
   @override
   Widget build(BuildContext context) {
@@ -52,9 +68,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.1),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
@@ -79,61 +96,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       "Sign up to get started",
                       style: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                       ),
                     ),
                     const SizedBox(height: 32),
 
-                    // User ID Field
+                    // Username Field
                     TextField(
-                      controller: userID,
+                      controller: username,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        labelText: "User ID",
-                        labelStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.badge_outlined,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Name Field
-                    TextField(
-                      controller: name,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: "Full Name",
+                        labelText: "Username",
                         labelStyle: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -143,25 +121,30 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Email Field
+                    TextField(
+                      controller: email,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: "Email",
+                        labelStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -188,9 +171,6 @@ class _SignupScreenState extends State<SignupScreen> {
                             isPasswordVisible
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
                           ),
                           onPressed: () {
                             setState(() {
@@ -200,25 +180,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -245,9 +207,6 @@ class _SignupScreenState extends State<SignupScreen> {
                             isConfPasswordVisible
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
                           ),
                           onPressed: () {
                             setState(() {
@@ -257,25 +216,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -284,82 +225,101 @@ class _SignupScreenState extends State<SignupScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                          shadowColor: Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.3),
-                        ),
-                        onPressed: () {
-                          final userID_ = userID.text.trim();
-                          final name_ = name.text.trim();
-                          final password_ = password.text;
-                          final confirm_ = confirmPassword.text;
+                      child: Obx(() => ElevatedButton(
+                            onPressed: authController.isLoading.value
+                                ? null
+                                : () async {
+                                    final user = username.text.trim();
+                                    final mail = email.text.trim();
+                                    final pass = password.text;
+                                    final conf = confirmPassword.text;
 
-                          if (userID_.isEmpty ||
-                              name_.isEmpty ||
-                              password_.isEmpty ||
-                              confirm_.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  "Please complete all required fields.",
-                                ),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.error,
+                                    if (user.isEmpty ||
+                                        mail.isEmpty ||
+                                        pass.isEmpty ||
+                                        conf.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                              "Please complete all required fields."),
+                                          backgroundColor:
+                                              Theme.of(context).colorScheme.error,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    if (pass != conf) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                              "Passwords do not match"),
+                                          backgroundColor:
+                                              Theme.of(context).colorScheme.error,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final success =
+                                        await authController.register(
+                                      userName: user,
+                                      email: mail,
+                                      password: pass,
+                                    );
+
+                                    if (success) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Signup successful!"),
+                                          backgroundColor: Colors.blue,
+                                        ),
+                                      );
+
+                                      username.clear();
+                                      email.clear();
+                                      password.clear();
+                                      confirmPassword.clear();
+
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const SigninScreen(),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              authController.errorMessage.value),
+                                          backgroundColor:
+                                              Theme.of(context).colorScheme.error,
+                                        ),
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            );
-                            return;
-                          }
-
-                          if (password_ != confirm_) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text("Passwords do not match"),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.error,
-                              ),
-                            );
-                            return;
-                          }
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text("Signup successful!"),
-                              backgroundColor: Colors.blue,
                             ),
-                          );
-
-                          userID.clear();
-                          name.clear();
-                          password.clear();
-                          confirmPassword.clear();
-
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SigninScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          "Sign Up",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                            child: authController.isLoading.value
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text(
+                                    "Sign Up",
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                          )),
                     ),
                     const SizedBox(height: 24),
 
@@ -370,9 +330,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         Text(
                           "Already have an account?",
                           style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.7),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.7),
                           ),
                         ),
                         TextButton(
@@ -403,4 +364,4 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-}
+} */

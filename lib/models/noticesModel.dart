@@ -13,21 +13,19 @@ class NoticeModel {
 
   factory NoticeModel.fromJson(Map<String, dynamic> json) {
     return NoticeModel(
-      title: json['title'],
-      description: json['description'],
-      date: DateTime.parse(json['date']), // if API returns string
-      isNew: false, // default, we will calculate in controller
+      title: json['notice'] ?? "No Title",
+      description: json['note'] ?? "",
+      date: DateTime.tryParse(json['date'] ?? "") ?? DateTime.now(),
+      isNew: false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'title': title,
-      'description': description,
+      'notice': title,
+      'note': description,
       'date': date.toIso8601String(),
       'isNew': isNew,
     };
   }
-
-  void operator [](String other) {}
 }
