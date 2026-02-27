@@ -26,7 +26,7 @@ class _SigninScreenState extends State<SigninScreen> {
   final AuthService _authService = AuthService();
 
   Future<void> _handleLogin() async {
-    final userName = userID.text.trim();
+    final userName = username.text.trim();
     final pass = password.text.trim();
 
     if (userName.isEmpty || pass.isEmpty) {
