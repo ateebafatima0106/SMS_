@@ -10,18 +10,14 @@ import 'package:school_management_system/controllers/student_fee_controller.dart
 import 'package:school_management_system/dashboard/Drawer_Screens/singleMarksheetScreen.dart';
 import 'controllers/theme_controller.dart';
 import 'package:school_management_system/splashscreen.dart';
-import 'theme/app_theme.dart'; 
+import 'theme/app_theme.dart';
 
-void main() async{
-   WidgetsFlutterBinding.ensureInitialized();
-
-  final authController = Get.put(AuthController(), permanent: true);
-  await authController.loadToken();
-  Get.put(NoticesController(), permanent: true);
-  Get.put(AttendanceController());
+void main() {
   Get.put(AdmitCardController());
   Get.put(CompositeMarksheetController());
+  //Get.put(MarksheetController());
   Get.put(ThemeController());
+  Get.put(NoticesController());
   Get.put(StudentFeeController());
   runApp(const MyApp());
 }
@@ -31,16 +27,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final ThemeController themeController = Get.find<ThemeController>();
 
-    return Obx(() => GetMaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'School Management System',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: themeController.themeMode.value, 
-          home: const SplashScreen(),
-        ));
+    return Obx(
+      () => GetMaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'School Management System',
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeController.themeMode.value,
+        home: const SplashScreen(),
+      ),
+    );
   }
 }

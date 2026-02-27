@@ -5,6 +5,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:school_management_system/models/compositeMarksheetModel.dart';
+import 'package:school_management_system/services/api_service.dart';
+import 'package:school_management_system/services/auth_service.dart';
 
 class CompositeMarksheetController extends GetxController {
   // Observable variables
@@ -20,43 +22,188 @@ class CompositeMarksheetController extends GetxController {
   final selectedYear = Rx<String?>(null);
   final availableYears = <String>[].obs;
 
+  final _api = ApiService();
+  final _auth = AuthService();
+
   @override
   void onInit() {
     super.onInit();
     loadYearlyData();
   }
 
-  /// Load yearly composite marksheet data
+  /// Load yearly composite marksheet data from API.
+  /// The API returns a flat list of per-subject-per-task records.
+  /// We group them into a nested CompositeMarksheetModel structure.
   Future<void> loadYearlyData() async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
 
-      // Simulate API delay
-      await Future.delayed(const Duration(milliseconds: 800));
+      final studentId = await _auth.getStudentId();
+      if (studentId == null || studentId.isEmpty) {
+        errorMessage.value = 'Student ID not found. Please login again.';
+        return;
+      }
 
-      // Using dummy data for now
-      yearlyMarks.value = _getDummyData();
+      // API expects plain year like '2025', '2024', etc. — not '2025-2026'
+      final currentYear = DateTime.now().year;
+      final years = [
+        currentYear.toString(),
+        (currentYear - 1).toString(),
+        (currentYear - 2).toString(),
+      ];
+      List<CompositeMarksheetModel> allMarksheets = [];
+
+      for (final year in years) {
+        try {
+          final response = await _api.get(
+            '/Composite/Get-CompositeMarksheet',
+            queryParams: {'StudentId': studentId, 'Year': year},
+          );
+
+          // API may return a plain string like "No Record Found"
+          if (response is String) continue;
+
+          if (response is List && response.isNotEmpty) {
+            final grouped = _groupApiResponse(
+              response.cast<Map<String, dynamic>>(),
+              year,
+            );
+            if (grouped != null) {
+              allMarksheets.add(grouped);
+            }
+          }
+        } catch (_) {
+          // Skip years with no data
+        }
+      }
+
+      if (allMarksheets.isEmpty) {
+        errorMessage.value = 'No composite marksheet data found.';
+        return;
+      }
+
+      yearlyMarks.value = allMarksheets;
 
       // Extract available years
       availableYears.value =
           yearlyMarks.map((m) => m.academicYear).toSet().toList()
-            ..sort((a, b) => b.compareTo(a)); // Latest first
+            ..sort((a, b) => b.compareTo(a));
 
       if (availableYears.isNotEmpty) {
         selectedYear.value = availableYears.first;
         _setCurrentMarksheetForSelectedYear();
       }
+    } on ApiException catch (e) {
+      errorMessage.value = e.message;
     } catch (e) {
       errorMessage.value = 'Failed to load marksheets: ${e.toString()}';
-      Get.snackbar(
-        'Error',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-      );
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Group flat API response into nested CompositeMarksheetModel.
+  ///
+  /// API returns: [{subjectName, taskName, totalMarks, passingMarks, obtMarks, learningArea, ...}]
+  /// We group by subject → list of assessments (tasks)
+  CompositeMarksheetModel? _groupApiResponse(
+    List<Map<String, dynamic>> records,
+    String year,
+  ) {
+    if (records.isEmpty) return null;
+
+    // Extract student info from first record
+    final first = records.first;
+    final studentId = (first['studentId'] ?? '').toString();
+    final studentName = (first['name'] ?? '').toString();
+    final fatherName = (first['fatherName'] ?? '').toString();
+    final rollNo = (first['rollNo'] ?? '').toString();
+    final classDesc = (first['classDesc'] ?? '').toString();
+
+    // Group records by subject
+    final Map<String, List<Map<String, dynamic>>> bySubject = {};
+    for (final record in records) {
+      final subjectName = (record['subjectName'] ?? '').toString();
+      bySubject.putIfAbsent(subjectName, () => []).add(record);
+    }
+
+    // Build SubjectAssessments
+    final subjectAssessments = <SubjectAssessment>[];
+    double totalMaxAll = 0;
+    double totalObtAll = 0;
+
+    for (final entry in bySubject.entries) {
+      final assessments = <Assessment>[];
+      double aggMax = 0;
+      double aggObt = 0;
+
+      for (final r in entry.value) {
+        final maxM = (r['totalMarks'] ?? 0).toDouble();
+        final passM = (r['passingMarks'] ?? 0).toDouble();
+        final obtM = (r['obtMarks'] ?? 0).toDouble();
+
+        assessments.add(
+          Assessment(
+            assessmentId: (r['id'] ?? '').toString(),
+            assessmentTitle: (r['taskName'] ?? '').toString(),
+            maxMarks: maxM,
+            passingMarks: passM,
+            obtainedMarks: obtM,
+          ),
+        );
+
+        aggMax += maxM;
+        aggObt += obtM;
+      }
+
+      totalMaxAll += aggMax;
+      totalObtAll += aggObt;
+
+      subjectAssessments.add(
+        SubjectAssessment(
+          learningArea: (entry.value.first['learningArea'] ?? '').toString(),
+          subject: entry.key,
+          assessments: assessments,
+          aggregateMaxMarks: aggMax,
+          aggregateObtainedMarks: aggObt,
+        ),
+      );
+    }
+
+    final percentage = totalMaxAll > 0
+        ? (totalObtAll / totalMaxAll * 100).toDouble()
+        : 0.0;
+    final grade = _calculateGrade(percentage);
+
+    return CompositeMarksheetModel(
+      academicYear: year,
+      studentInfo: StudentInfo(
+        studentId: studentId,
+        studentName: studentName,
+        fatherName: fatherName,
+        rollNo: rollNo,
+        className: classDesc,
+        position: '',
+        result: percentage >= 40 ? 'PASS' : 'TRY AGAIN',
+        grade: grade,
+        totalMaxMarks: totalMaxAll,
+        totalObtainedMarks: totalObtAll,
+        percentage: percentage.toDouble(),
+      ),
+      subjectAssessments: subjectAssessments,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  String _calculateGrade(double percentage) {
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B';
+    if (percentage >= 60) return 'C';
+    if (percentage >= 50) return 'D';
+    if (percentage >= 40) return 'E';
+    return 'F';
   }
 
   /// Select a marksheet to view details
@@ -90,7 +237,6 @@ class CompositeMarksheetController extends GetxController {
       return;
     }
 
-    // If multiple exist for a year, prefer most recent.
     byYear.sort((a, b) {
       final aTs = a.createdAt?.millisecondsSinceEpoch ?? 0;
       final bTs = b.createdAt?.millisecondsSinceEpoch ?? 0;
@@ -132,7 +278,7 @@ class CompositeMarksheetController extends GetxController {
         try {
           studentPhoto = await networkImage(marksheet.studentInfo.photoUrl!);
         } catch (e) {
-          print('Failed to load photo: $e');
+          // Photo load failure — silently continue without photo
         }
       }
 
@@ -157,7 +303,6 @@ class CompositeMarksheetController extends GetxController {
         ),
       );
 
-      // Save and share PDF
       await Printing.sharePdf(
         bytes: await pdf.save(),
         filename:
@@ -181,7 +326,8 @@ class CompositeMarksheetController extends GetxController {
     }
   }
 
-  /// Build PDF header
+  // ─── PDF Building Helpers (unchanged) ──────────────────
+
   pw.Widget _buildPdfHeader(
     CompositeMarksheetModel marksheet,
     pw.ImageProvider? photo,
@@ -236,7 +382,6 @@ class CompositeMarksheetController extends GetxController {
     );
   }
 
-  /// Build PDF student info section using pw.Table for stability
   pw.Widget _buildPdfStudentInfo(
     StudentInfo info,
     pw.Font regFont,
@@ -313,7 +458,6 @@ class CompositeMarksheetController extends GetxController {
     );
   }
 
-  /// Build PDF table with all assessments using nested tables for perfect cross-row look
   pw.Widget _buildPdfTable(
     CompositeMarksheetModel marksheet,
     pw.Font regFont,
@@ -322,13 +466,12 @@ class CompositeMarksheetController extends GetxController {
     return pw.Table(
       border: pw.TableBorder.all(width: 1),
       columnWidths: {
-        0: const pw.FlexColumnWidth(1.8), // Learning Area
-        1: const pw.FlexColumnWidth(1.8), // Subject
-        2: const pw.FlexColumnWidth(4.9), // Assessment Title + Marks
-        3: const pw.FlexColumnWidth(1.2), // Agg. Marks
+        0: const pw.FlexColumnWidth(1.8),
+        1: const pw.FlexColumnWidth(1.8),
+        2: const pw.FlexColumnWidth(4.9),
+        3: const pw.FlexColumnWidth(1.2),
       },
       children: [
-        // Header Row
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: [
@@ -337,10 +480,10 @@ class CompositeMarksheetController extends GetxController {
             pw.Table(
               border: pw.TableBorder.all(width: 1),
               columnWidths: {
-                0: const pw.FlexColumnWidth(2.5), // Title
-                1: const pw.FlexColumnWidth(0.8), // Max
-                2: const pw.FlexColumnWidth(0.8), // Passing
-                3: const pw.FlexColumnWidth(0.8), // Obt
+                0: const pw.FlexColumnWidth(2.5),
+                1: const pw.FlexColumnWidth(0.8),
+                2: const pw.FlexColumnWidth(0.8),
+                3: const pw.FlexColumnWidth(0.8),
               },
               children: [
                 pw.TableRow(
@@ -356,13 +499,11 @@ class CompositeMarksheetController extends GetxController {
             _headerCell('Agg.\nMarks', boldFont),
           ],
         ),
-        // Data Rows
         ...marksheet.subjectAssessments.map((sa) {
           return pw.TableRow(
             children: [
               _dataCell(sa.learningArea.toUpperCase(), regFont),
               _dataCell(sa.subject.toUpperCase(), boldFont),
-              // Nested table for assessments
               pw.Table(
                 border: pw.TableBorder.all(width: 1),
                 columnWidths: {
@@ -389,7 +530,7 @@ class CompositeMarksheetController extends GetxController {
               ),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -424,7 +565,6 @@ class CompositeMarksheetController extends GetxController {
     );
   }
 
-  /// Build PDF footer
   pw.Widget _buildPdfFooter(pw.Font regFont) {
     return pw.Column(
       children: [
@@ -441,7 +581,6 @@ class CompositeMarksheetController extends GetxController {
     );
   }
 
-  /// Build signature line
   pw.Widget _buildSignature(String label, pw.Font regFont) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -451,358 +590,5 @@ class CompositeMarksheetController extends GetxController {
         pw.Text(label, style: pw.TextStyle(font: regFont, fontSize: 9)),
       ],
     );
-  }
-
-  /// Get dummy data matching the image structure
-  List<CompositeMarksheetModel> _getDummyData() {
-    return [
-      CompositeMarksheetModel(
-        academicYear: '2025-2026',
-        studentInfo: StudentInfo(
-          studentId: '506',
-          studentName: 'ANAIZA FATIMA',
-          fatherName: 'MD SUHAIL KHAN',
-          rollNo: '29',
-          className: 'MONT JUNIOR',
-          position: '',
-          result: 'TRY AGAIN',
-          grade: 'B',
-          totalMaxMarks: 1950,
-          totalObtainedMarks: 1300,
-          percentage: 66.67,
-        ),
-        subjectAssessments: [
-          SubjectAssessment(
-            learningArea: 'RELIGION',
-            subject: 'ISLAMIAT',
-            assessments: [
-              Assessment(
-                assessmentId: '1',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 96,
-              ),
-              Assessment(
-                assessmentId: '2',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '3',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 25,
-              ),
-              Assessment(
-                assessmentId: '4',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 7,
-              ),
-            ],
-            aggregateMaxMarks: 250,
-            aggregateObtainedMarks: 183,
-          ),
-          SubjectAssessment(
-            learningArea: 'NATIVE LANGUAGE',
-            subject: 'URDU',
-            assessments: [
-              Assessment(
-                assessmentId: '5',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 78,
-              ),
-              Assessment(
-                assessmentId: '6',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '7',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 22,
-              ),
-              Assessment(
-                assessmentId: '8',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 5,
-              ),
-            ],
-            aggregateMaxMarks: 250,
-            aggregateObtainedMarks: 160,
-          ),
-          SubjectAssessment(
-            learningArea: 'INTERNATIONAL LANGUAGE',
-            subject: 'ENGLISH',
-            assessments: [
-              Assessment(
-                assessmentId: '9',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 61,
-              ),
-              Assessment(
-                assessmentId: '10',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '11',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 22,
-              ),
-              Assessment(
-                assessmentId: '12',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 8,
-              ),
-            ],
-            aggregateMaxMarks: 250,
-            aggregateObtainedMarks: 146,
-          ),
-          SubjectAssessment(
-            learningArea: 'CONCEPT DEVELOPMENT',
-            subject: 'MATHEMATICS',
-            assessments: [
-              Assessment(
-                assessmentId: '13',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 73,
-              ),
-              Assessment(
-                assessmentId: '14',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '15',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 25,
-              ),
-              Assessment(
-                assessmentId: '16',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 9,
-              ),
-            ],
-            aggregateMaxMarks: 250,
-            aggregateObtainedMarks: 162,
-          ),
-          SubjectAssessment(
-            learningArea: 'INTERNATIONAL LANGUAGE',
-            subject: 'ESL',
-            assessments: [
-              Assessment(
-                assessmentId: '17',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 100,
-              ),
-              Assessment(
-                assessmentId: '18',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 100,
-                passingMarks: 40,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '19',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 25,
-              ),
-              Assessment(
-                assessmentId: '20',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 7,
-              ),
-            ],
-            aggregateMaxMarks: 250,
-            aggregateObtainedMarks: 187,
-          ),
-          SubjectAssessment(
-            learningArea: 'SOCIAL SCIENCES',
-            subject: 'GENERAL KNOWLEDGE',
-            assessments: [
-              Assessment(
-                assessmentId: '21',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '22',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '23',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 20,
-              ),
-              Assessment(
-                assessmentId: '24',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 6,
-              ),
-            ],
-            aggregateMaxMarks: 200,
-            aggregateObtainedMarks: 136,
-          ),
-          SubjectAssessment(
-            learningArea: 'CHARACTER BUILDING',
-            subject: 'VALUE EDUCATION',
-            assessments: [
-              Assessment(
-                assessmentId: '25',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 62,
-              ),
-              Assessment(
-                assessmentId: '26',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '27',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 18,
-              ),
-              Assessment(
-                assessmentId: '28',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 5,
-              ),
-            ],
-            aggregateMaxMarks: 200,
-            aggregateObtainedMarks: 140,
-          ),
-          SubjectAssessment(
-            learningArea: 'DRAWING & SKETCHING',
-            subject: 'ART & CRAFT',
-            assessments: [
-              Assessment(
-                assessmentId: '29',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 70,
-              ),
-              Assessment(
-                assessmentId: '30',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 75,
-                passingMarks: 30,
-                obtainedMarks: 55,
-              ),
-              Assessment(
-                assessmentId: '31',
-                assessmentTitle: 'Preliminary Test (Fall)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 23,
-              ),
-              Assessment(
-                assessmentId: '32',
-                assessmentTitle: 'Preliminary Test (Spring)',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 6,
-              ),
-            ],
-            aggregateMaxMarks: 200,
-            aggregateObtainedMarks: 154,
-          ),
-          SubjectAssessment(
-            learningArea: 'EXTRACURRICULAR ACTIVITY',
-            subject: 'ASSIGNMENT & CLASSROOM ACTIVITY',
-            assessments: [
-              Assessment(
-                assessmentId: '33',
-                assessmentTitle: 'Mid Term',
-                maxMarks: 25,
-                passingMarks: 15,
-                obtainedMarks: 0,
-              ),
-              Assessment(
-                assessmentId: '34',
-                assessmentTitle: 'Annual Term',
-                maxMarks: 25,
-                passingMarks: 0,
-                obtainedMarks: 0,
-              ),
-              Assessment(
-                assessmentId: '35',
-                assessmentTitle: 'Summer Assignment',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 23,
-              ),
-              Assessment(
-                assessmentId: '36',
-                assessmentTitle: 'Winter Assignment',
-                maxMarks: 25,
-                passingMarks: 10,
-                obtainedMarks: 9,
-              ),
-            ],
-            aggregateMaxMarks: 100,
-            aggregateObtainedMarks: 32,
-          ),
-        ],
-      ),
-    ];
-  }
-
-  @override
-  void onClose() {
-    super.onClose();
   }
 }

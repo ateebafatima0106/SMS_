@@ -1,436 +1,263 @@
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:school_management_system/models/student_fee_models.dart';
+import 'package:school_management_system/services/api_service.dart';
+import 'package:school_management_system/services/auth_service.dart';
 
-/// Student Fee Controller
-/// API-ready: replace _simulateApi* methods with real API calls
+/// Student Fee Controller — fetches data from 3 real APIs:
+///   1. GET /StudentFee/Get-StudentFees?Year=...
+///   2. GET /StudentFee/Get-StudentFeeAdditionals?Year=...
+///   3. GET /PendingFee/Get-PendingFee-Tasks?StudentId=...&Year=...
 class StudentFeeController extends GetxController {
-  // Reactive state
+  // ─── State ──────────────────────────────────────────────
   final RxBool isLoading = false.obs;
-  final RxList<FeeRecord> paidFees = <FeeRecord>[].obs;
-  final RxList<String> unpaidMonths = <String>[].obs;
-  final Rx<FeeSearchFilter> currentFilter = FeeSearchFilter().obs;
-  final Rxn<StudentFeeModel> selectedStudent = Rxn<StudentFeeModel>();
+  final RxString errorMessage = ''.obs;
 
-  // Form fields (for two-way binding)
-  final departmentController = TextEditingController();
-  final studentNameController = TextEditingController();
-  final receiptNoController = TextEditingController();
-  final studentIdController = TextEditingController();
-  final Rx<DateTime?> selectedDate = Rx<DateTime?>(DateTime.now());
-  final RxBool sendMessage = false.obs;
+  // Fee data
+  final RxList<FeeRecord> regularFees = <FeeRecord>[].obs;
+  final RxList<FeeRecord> additionalFees = <FeeRecord>[].obs;
+  final RxString pendingFeeMessage = ''.obs;
 
-  // Dropdown values (Rx for reactive dropdowns)
-  final RxString selectedDepartment = ''.obs;
-  final RxString selectedSessionYear = ''.obs;
-  final RxString selectedMonth = ''.obs;
-  final RxString selectedYearFee = ''.obs;
-  final Rx<FeeType> selectedFeeType = FeeType.monthly.obs;
+  // Student info (extracted from fee records)
+  final RxString studentName = ''.obs;
+  final RxString studentId = ''.obs;
 
-  // Options for dropdowns (can be loaded from API)
-  final RxList<String> departments = <String>[].obs;
-  final RxList<String> sessionYears = <String>[].obs;
-  final RxList<String> months = <String>[].obs;
-  final RxList<String> yearFeeOptions = <String>[].obs;
+  // Year filter
+  final RxString selectedYear = ''.obs;
+  static final List<String> yearOptions = [
+    DateTime.now().year.toString(),
+    (DateTime.now().year - 1).toString(),
+    (DateTime.now().year - 2).toString(),
+  ];
 
-  // Computed (reactive via Obx on selectedStudent/unpaidMonths)
-  double get tuitionFee => selectedStudent.value?.tuitionFee ?? 0.0;
-  int get unpaidMonthsCount => unpaidMonths.length;
+  final _api = ApiService();
+  final _auth = AuthService();
 
-  void selectStudent(StudentFeeModel? s) => selectedStudent.value = s;
+  // ─── Computed ───────────────────────────────────────────
+  double get totalRegularFees => regularFees.fold(0.0, (sum, r) => sum + r.fee);
+  double get totalAdditionalFees =>
+      additionalFees.fold(0.0, (sum, r) => sum + r.fee);
+  double get grandTotal => totalRegularFees + totalAdditionalFees;
 
+  // ─── Lifecycle ──────────────────────────────────────────
   @override
   void onInit() {
     super.onInit();
-    _loadDropdownOptions();
+    selectedYear.value = yearOptions.first;
+    _loadStudentInfo();
+    fetchAllFeeData();
   }
 
-  @override
-  void onClose() {
-    departmentController.dispose();
-    studentNameController.dispose();
-    receiptNoController.dispose();
-    studentIdController.dispose();
-    super.onClose();
+  Future<void> _loadStudentInfo() async {
+    studentId.value = await _auth.getStudentId() ?? '';
+    studentName.value = await _auth.getStudentName() ?? '';
   }
 
-  void _loadDropdownOptions() {
-    // Replace with API: fetchDepartments(), fetchSessionYears(), etc.
-    departments.value = [
-      'Computer Science',
-      'Mathematics',
-      'Physics',
-      'Chemistry',
-    ];
-    sessionYears.value = ['2024-25', '2023-24', '2022-23'];
-    months.value = List.generate(12, (i) => _monthName(i + 1));
-    yearFeeOptions.value = ['2024', '2023', '2022'];
-    if (departments.isNotEmpty) selectedDepartment.value = departments.first;
-    if (sessionYears.isNotEmpty) selectedSessionYear.value = sessionYears.first;
-    if (months.isNotEmpty)
-      selectedMonth.value = months[DateTime.now().month - 1];
-    if (yearFeeOptions.isNotEmpty) selectedYearFee.value = yearFeeOptions.first;
-  }
+  // ─── Fetch All 3 APIs ──────────────────────────────────
+  Future<void> fetchAllFeeData() async {
+    isLoading.value = true;
+    errorMessage.value = '';
 
-  String _monthName(int m) {
-    const names = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return names[m - 1];
-  }
-
-  /// Fetch fee data based on current filter
-  Future<void> fetchFeeData() async {
     try {
-      isLoading.value = true;
-      if (selectedFeeType.value == FeeType.monthly) {
-        await searchByMonth();
+      if (studentId.value.isEmpty) {
+        await _loadStudentInfo();
+      }
+
+      await Future.wait([
+        _fetchRegularFees(),
+        _fetchAdditionalFees(),
+        _fetchPendingFees(),
+      ]);
+    } catch (e) {
+      errorMessage.value = 'Failed to load fee data: ${e.toString()}';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// 1. GET /StudentFee/Get-StudentFees?Year=...
+  Future<void> _fetchRegularFees() async {
+    try {
+      final response = await _api.get(
+        '/StudentFee/Get-StudentFees',
+        queryParams: {'Year': selectedYear.value},
+      );
+
+      if (response is Map<String, dynamic> &&
+          response['success'] == true &&
+          response['data'] is List) {
+        final data = (response['data'] as List)
+            .cast<Map<String, dynamic>>()
+            .map((json) => FeeRecord.fromJson(json))
+            .toList();
+
+        // Filter for current student
+        final sid = studentId.value;
+        if (sid.isNotEmpty) {
+          regularFees.value = data
+              .where((r) => r.studentId.toString() == sid)
+              .toList();
+        } else {
+          regularFees.value = data;
+        }
+      } else if (response is String) {
+        // "No Record Found" or similar
+        regularFees.clear();
       } else {
-        await searchByYear();
+        regularFees.clear();
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode != 404) {
+        errorMessage.value = e.message;
+      }
+      regularFees.clear();
+    }
+  }
+
+  /// 2. GET /StudentFee/Get-StudentFeeAdditionals?Year=...
+  Future<void> _fetchAdditionalFees() async {
+    try {
+      final response = await _api.get(
+        '/StudentFee/Get-StudentFeeAdditionals',
+        queryParams: {'Year': selectedYear.value},
+      );
+
+      if (response is Map<String, dynamic> &&
+          response['success'] == true &&
+          response['data'] is List) {
+        final data = (response['data'] as List)
+            .cast<Map<String, dynamic>>()
+            .map((json) => FeeRecord.fromJson(json))
+            .toList();
+
+        final sid = studentId.value;
+        if (sid.isNotEmpty) {
+          additionalFees.value = data
+              .where((r) => r.studentId.toString() == sid)
+              .toList();
+        } else {
+          additionalFees.value = data;
+        }
+      } else if (response is String) {
+        additionalFees.clear();
+      } else {
+        additionalFees.clear();
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode != 404) {
+        errorMessage.value = e.message;
+      }
+      additionalFees.clear();
+    }
+  }
+
+  /// 3. GET /PendingFee/Get-PendingFee-Tasks?StudentId=...&Year=...
+  Future<void> _fetchPendingFees() async {
+    try {
+      final sid = studentId.value;
+      if (sid.isEmpty) {
+        pendingFeeMessage.value = 'Failed to load student ID';
+        return;
+      }
+
+      final response = await _api.get(
+        '/PendingFee/Get-PendingFee-Tasks',
+        queryParams: {'StudentId': sid, 'Year': selectedYear.value},
+      );
+
+      if (response is String) {
+        // "No Pending Fee" or similar message
+        pendingFeeMessage.value = response.trim().replaceAll('"', '');
+      } else if (response is List) {
+        // TODO: Parse pending fee list if API returns structured data
+        pendingFeeMessage.value = response.map((e) => e.toString()).join(', ');
+      } else {
+        pendingFeeMessage.value = 'No Pending Fee';
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 404 ||
+          e.message.toLowerCase().contains('no pending')) {
+        pendingFeeMessage.value = 'No Pending Fee';
+      } else {
+        pendingFeeMessage.value = 'Error checking pending fees: ${e.message}';
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to fetch fee data');
-    } finally {
-      isLoading.value = false;
+      pendingFeeMessage.value = 'Error checking pending fees';
     }
   }
 
-  /// Search by month + year (Monthly fees)
-  Future<void> searchByMonth() async {
-    try {
-      isLoading.value = true;
-      paidFees.clear();
-      unpaidMonths.clear();
-      selectedStudent.value = null;
-
-      // Simulate: load student by studentId
-      await _simulateLoadStudent();
-
-      final filter = FeeSearchFilter(
-        year: selectedSessionYear.value,
-        month: selectedMonth.value,
-        feeType: FeeType.monthly,
-      );
-      currentFilter.value = filter;
-
-      // Simulate API response: unpaid months first, then paid records
-      final result = await _simulateSearchMonthly(filter);
-      unpaidMonths.value = result.$1;
-      paidFees.value = result.$2;
-    } catch (e) {
-      Get.snackbar('Error', 'Search failed');
-    } finally {
-      isLoading.value = false;
-    }
+  // ─── Year change ────────────────────────────────────────
+  void onYearChanged(String year) {
+    selectedYear.value = year;
+    fetchAllFeeData();
   }
 
-  /// Search by year only (Yearly fees)
-  Future<void> searchByYear() async {
-    try {
-      isLoading.value = true;
-      paidFees.clear();
-      unpaidMonths.clear();
-      selectedStudent.value = null;
-
-      await _simulateLoadStudent();
-
-      final filter = FeeSearchFilter(
-        year: selectedYearFee.value,
-        feeType: FeeType.yearly,
-      );
-      currentFilter.value = filter;
-
-      final result = await _simulateSearchYearly(filter);
-      unpaidMonths.value = result.$1;
-      paidFees.value = result.$2;
-    } catch (e) {
-      Get.snackbar('Error', 'Search failed');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Search by receipt number
-  Future<void> searchByReceiptNo() async {
-    final receipt = receiptNoController.text.trim();
-    if (receipt.isEmpty) {
-      Get.snackbar('Info', 'Please enter Receipt No');
-      return;
-    }
-    try {
-      isLoading.value = true;
-      paidFees.clear();
-      unpaidMonths.clear();
-
-      final result = await _simulateSearchByReceipt(receipt);
-      if (result != null) {
-        selectedStudent.value = result.$1;
-        unpaidMonths.value = result.$2;
-        paidFees.value = result.$3;
-      } else {
-        Get.snackbar('Not Found', 'No record for Receipt: $receipt');
-      }
-    } catch (e) {
-      Get.snackbar('Error', 'Search failed');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Submit fee (API placeholder)
-  Future<void> submitFee() async {
-    try {
-      isLoading.value = true;
-      await _simulateSubmitFee();
-      Get.snackbar('Success', 'Fee submitted successfully');
-      await fetchFeeData();
-    } catch (e) {
-      Get.snackbar('Error', 'Submit failed');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Delete fee record (API placeholder)
-  Future<void> deleteFeeRecord(FeeRecord record) async {
-    try {
-      isLoading.value = true;
-      await _simulateDeleteFee(record);
-      paidFees.removeWhere((e) => e.id == record.id);
-      Get.snackbar('Success', 'Record deleted');
-    } catch (e) {
-      Get.snackbar('Error', 'Delete failed');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  void setSelectedDate(DateTime? date) {
-    selectedDate.value = date;
-  }
-
-  // --- API simulation (replace with real API calls) ---
-
-  Future<void> _simulateLoadStudent() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final id = studentIdController.text.trim();
-    if (id.isEmpty) {
-      selectedStudent.value = StudentFeeModel(
-        studentId: 'STU001',
-        studentName: 'John Doe',
-        department: selectedDepartment.value,
-        tuitionFee: 5000,
-        imageUrl: null,
-      );
-    } else {
-      selectedStudent.value = StudentFeeModel(
-        studentId: id,
-        studentName: studentNameController.text.trim().isEmpty
-            ? 'Student $id'
-            : studentNameController.text.trim(),
-        department: selectedDepartment.value,
-        tuitionFee: 5000,
-        imageUrl: null,
-      );
-    }
-  }
-
-  Future<(List<String>, List<FeeRecord>)> _simulateSearchMonthly(
-    FeeSearchFilter filter,
-  ) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final year = filter.year.split('-').first;
-    final unpaid = ['January $year', 'February $year', 'March $year'];
-    final paid = [
-      FeeRecord(
-        id: '1',
-        year: year,
-        month: 'Apr',
-        details: 'Monthly',
-        amount: 5000,
-        feeDate: DateTime(int.parse(year), 4, 15),
-        receiptNo: 'RCP001',
-      ),
-      FeeRecord(
-        id: '2',
-        year: year,
-        month: 'May',
-        details: 'Monthly',
-        amount: 5000,
-        feeDate: DateTime(int.parse(year), 5, 10),
-        receiptNo: 'RCP002',
-      ),
-    ];
-    return (unpaid, paid);
-  }
-
-  Future<(List<String>, List<FeeRecord>)> _simulateSearchYearly(
-    FeeSearchFilter filter,
-  ) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final year = filter.year;
-    final unpaid = ['Annual Fee $year'];
-    final paid = [
-      FeeRecord(
-        id: '3',
-        year: year,
-        month: '-',
-        details: 'Yearly',
-        amount: 60000,
-        feeDate: DateTime(int.parse(year), 4, 1),
-        receiptNo: 'RCP003',
-      ),
-    ];
-    return (unpaid, paid);
-  }
-
-  Future<(StudentFeeModel, List<String>, List<FeeRecord>)?>
-  _simulateSearchByReceipt(String receipt) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return (
-      StudentFeeModel(
-        studentId: 'STU001',
-        studentName: 'John Doe',
-        department: 'Computer Science',
-        tuitionFee: 5000,
-        imageUrl: null,
-      ),
-      ['January 2024', 'February 2024'],
-      [
-        FeeRecord(
-          id: '1',
-          year: '2024',
-          month: 'Mar',
-          details: 'Monthly',
-          amount: 5000,
-          feeDate: DateTime(2024, 3, 15),
-          receiptNo: receipt,
-        ),
-      ],
-    );
-  }
-
-  Future<void> _simulateSubmitFee() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
-
-  Future<void> _simulateDeleteFee(FeeRecord record) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-  }
-
-  /// Generate PDF fee receipt/report
-  /// Returns PDF bytes for printing or sharing
+  // ─── PDF Generation ────────────────────────────────────
   Future<Uint8List?> generatePdf() async {
-    final student = selectedStudent.value;
-    if (student == null) {
-      Get.snackbar('Info', 'Select a student first');
+    if (regularFees.isEmpty && additionalFees.isEmpty) {
+      Get.snackbar('Info', 'No fee records to generate PDF.');
       return null;
     }
+
     final doc = pw.Document();
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) => _buildPdfHeader(student),
-        footer: (context) => _buildPdfFooter(),
-        build: (context) => [
+        header: (_) => _pdfHeader(),
+        footer: (_) => _pdfFooter(),
+        build: (_) => [
           pw.SizedBox(height: 16),
-          _buildPdfStudentInfo(student),
+          _pdfStudentInfo(),
           pw.SizedBox(height: 20),
-          if (unpaidMonths.isNotEmpty) ...[
+          if (regularFees.isNotEmpty) ...[
             pw.Text(
-              'Unpaid Months',
-              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+              'Monthly / Regular Fees',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
-            pw.SizedBox(height: 4),
-            pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.red),
-                color: PdfColors.red50,
-              ),
-              child: pw.Text(
-                unpaidMonths.join(', '),
-                style: const pw.TextStyle(fontSize: 10),
-              ),
-            ),
-            pw.SizedBox(height: 16),
+            pw.SizedBox(height: 8),
+            _pdfFeeTable(regularFees),
+            pw.SizedBox(height: 8),
+            _pdfTotalRow('Total Regular Fees', totalRegularFees),
+            pw.SizedBox(height: 20),
           ],
-          pw.Text(
-            'Fee Records',
-            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 8),
-          _buildPdfFeeTable(),
+          if (additionalFees.isNotEmpty) ...[
+            pw.Text(
+              'Additional Fees',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            _pdfFeeTable(additionalFees),
+            pw.SizedBox(height: 8),
+            _pdfTotalRow('Total Additional Fees', totalAdditionalFees),
+            pw.SizedBox(height: 20),
+          ],
+          pw.Divider(),
+          _pdfTotalRow('Grand Total', grandTotal),
         ],
       ),
     );
+
     return doc.save();
   }
 
-  pw.Widget _buildPdfHeader(StudentFeeModel student) {
+  pw.Widget _pdfHeader() {
     return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Container(
-              width: 60,
-              height: 60,
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.black),
-              ),
-              child: pw.Center(
-                child: pw.Text('Logo', style: pw.TextStyle(fontSize: 8)),
-              ),
-            ),
-            pw.Expanded(
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    'School Name',
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.SizedBox(height: 2),
-                  pw.Text('School Address', style: pw.TextStyle(fontSize: 10)),
-                ],
-              ),
-            ),
-            pw.Container(
-              width: 50,
-              height: 60,
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.black),
-              ),
-              child: pw.Center(
-                child: pw.Text('Photo', style: pw.TextStyle(fontSize: 8)),
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 8),
         pw.Center(
           child: pw.Text(
-            'Fee Receipt / Fee Report',
-            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            'BENCHMARK School of Leadership',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Center(
+          child: pw.Text(
+            'Fee Statement — Year ${selectedYear.value}',
+            style: const pw.TextStyle(fontSize: 12),
           ),
         ),
         pw.Divider(),
@@ -438,63 +265,69 @@ class StudentFeeController extends GetxController {
     );
   }
 
-  pw.Widget _buildPdfStudentInfo(StudentFeeModel student) {
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black),
-      columnWidths: {
-        0: const pw.FlexColumnWidth(2),
-        1: const pw.FlexColumnWidth(3),
-      },
-      children: [
-        _pdfTableRow('Student ID', student.studentId),
-        _pdfTableRow('Student Name', student.studentName),
-        _pdfTableRow('Department', student.department),
-        _pdfTableRow('Tuition Fee', student.tuitionFee.toStringAsFixed(0)),
-      ],
-    );
-  }
-
-  pw.TableRow _pdfTableRow(String label, String value) {
-    return pw.TableRow(
-      children: [
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(6),
-          child: pw.Text(
-            label,
-            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+  pw.Widget _pdfStudentInfo() {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey400),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  'Student: ',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  studentName.value,
+                  style: const pw.TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
           ),
-        ),
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(6),
-          child: pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
-        ),
-      ],
+          pw.Expanded(
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  'ID: ',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  studentId.value,
+                  style: const pw.TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  pw.Widget _buildPdfFeeTable() {
-    final headers = [
-      'Year',
-      'Month',
-      'Details',
-      'Amount',
-      'Fee Date',
-      'Receipt No',
-    ];
+  pw.Widget _pdfFeeTable(List<FeeRecord> records) {
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black),
+      border: pw.TableBorder.all(color: PdfColors.grey600),
       columnWidths: {
         0: const pw.FlexColumnWidth(1),
-        1: const pw.FlexColumnWidth(1),
-        2: const pw.FlexColumnWidth(1),
-        3: const pw.FlexColumnWidth(1),
+        1: const pw.FlexColumnWidth(1.5),
+        2: const pw.FlexColumnWidth(2),
+        3: const pw.FlexColumnWidth(1.5),
         4: const pw.FlexColumnWidth(1.5),
         5: const pw.FlexColumnWidth(1),
       },
       children: [
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          children: headers
+          children: ['Year', 'Month', 'Details', 'Fee Date', 'Amount', 'Slip #']
               .map(
                 (h) => pw.Padding(
                   padding: const pw.EdgeInsets.all(6),
@@ -509,57 +342,53 @@ class StudentFeeController extends GetxController {
               )
               .toList(),
         ),
-        ...paidFees.map(
+        ...records.map(
           (r) => pw.TableRow(
-            children: [
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(r.year, style: const pw.TextStyle(fontSize: 9)),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(r.month, style: const pw.TextStyle(fontSize: 9)),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(
-                  r.details,
-                  style: const pw.TextStyle(fontSize: 9),
-                ),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(
-                  r.amount.toStringAsFixed(0),
-                  style: const pw.TextStyle(fontSize: 9),
-                ),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(
-                  '${r.feeDate.day}/${r.feeDate.month}/${r.feeDate.year}',
-                  style: const pw.TextStyle(fontSize: 9),
-                ),
-              ),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(
-                  r.receiptNo,
-                  style: const pw.TextStyle(fontSize: 9),
-                ),
-              ),
-            ],
+            children:
+                [
+                      r.year,
+                      r.month,
+                      r.details,
+                      r.feeDate,
+                      r.fee.toStringAsFixed(0),
+                      r.slipNo.toString(),
+                    ]
+                    .map(
+                      (v) => pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          v,
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
         ),
       ],
     );
   }
 
-  pw.Widget _buildPdfFooter() {
+  pw.Widget _pdfTotalRow(String label, double total) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.end,
+      children: [
+        pw.Text(
+          '$label: ',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.Text(
+          'Rs. ${total.toStringAsFixed(0)}',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfFooter() {
     return pw.Column(
       children: [
         pw.Divider(),
-        pw.SizedBox(height: 4),
         pw.Center(
           child: pw.Text(
             'Powered by KI Software Solutions',

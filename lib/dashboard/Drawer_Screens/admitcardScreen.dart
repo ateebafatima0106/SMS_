@@ -374,7 +374,7 @@ class AdmitCardScreen extends StatelessWidget {
         );
         logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
       } catch (e) {
-        debugPrint("Image load error: $e");
+        // Image load failure — silently continue without logo
       }
 
       pdf.addPage(
